@@ -1,0 +1,16 @@
+{
+  "name": "fitness-litrpg-frontend-tests",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Playwright E2E tests for the Iron Path frontend",
+  "scripts": {
+    "test": "playwright test",
+    "test:headed": "playwright test --headed",
+    "test:ui": "playwright test --ui",
+    "test:report": "playwright show-report"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.45.0",
+    "http-server": "^14.1.1"
+  }
+}

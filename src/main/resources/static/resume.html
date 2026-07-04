@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Jermaine N. Chase — Résumé</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Inter:wght@400;500&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg:#14110b; --bg-2:#0e0c07; --panel:#1d1810; --edge:#36291a; --edge-soft:#281f14;
+            --gold:#d7a34a; --gold-bright:#f1c772; --gold-dim:#8a6e3a;
+            --parchment:#ece2cf; --muted:#9c8e75; --faint:#6f6450;
+            --display:"Fraunces",Georgia,serif; --body:"Inter","Segoe UI",system-ui,sans-serif; --mono:"JetBrains Mono",ui-monospace,monospace;
+        }
+        * { box-sizing: border-box; }
+        body {
+            margin: 0; font-family: var(--body); color: var(--parchment); line-height: 1.6;
+            background: radial-gradient(120% 80% at 50% -10%, #1c1710 0%, var(--bg) 45%, var(--bg-2) 100%);
+            background-attachment: fixed; -webkit-font-smoothing: antialiased;
+        }
+        .toolbar {
+            max-width: 880px; margin: 0 auto; padding: 16px clamp(18px,5vw,40px);
+            display: flex; justify-content: space-between; align-items: center; gap: 12px;
+            font-family: var(--mono); font-size: 0.74rem; letter-spacing: 0.06em;
+        }
+        .toolbar a, .toolbar button {
+            font-family: var(--mono); font-size: 0.74rem; letter-spacing: 0.06em;
+            color: var(--gold); background: none; border: 1px solid var(--edge);
+            padding: 7px 13px; border-radius: 3px; text-decoration: none; cursor: pointer;
+            transition: border-color 0.2s, color 0.2s;
+        }
+        .toolbar a:hover, .toolbar button:hover { border-color: var(--gold-dim); color: var(--gold-bright); }
+
+        .sheet {
+            max-width: 880px; margin: 8px auto 70px; padding: clamp(30px,5vw,56px) clamp(22px,5vw,56px);
+            background: var(--panel); border: 1px solid var(--edge);
+            border-radius: 8px; box-shadow: 0 24px 60px rgba(0,0,0,0.45);
+        }
+        .head { border-bottom: 1px solid var(--edge); padding-bottom: 24px; }
+        .head h1 { font-family: var(--display); font-weight: 600; font-size: clamp(2rem,5vw,2.9rem); letter-spacing: -0.015em; margin: 0; line-height: 1.05; }
+        .head .role { font-family: var(--mono); font-size: 0.92rem; letter-spacing: 0.16em; text-transform: uppercase; color: var(--gold); margin: 12px 0 0; }
+        .contact { margin: 18px 0 0; display: flex; flex-wrap: wrap; gap: 8px 20px; font-size: 0.88rem; color: var(--muted); }
+        .contact a { color: var(--muted); text-decoration: none; }
+        .contact a:hover { color: var(--gold); }
+
+        section.block { padding-top: 30px; }
+        .block > h2 {
+            font-family: var(--mono); font-size: 0.74rem; letter-spacing: 0.24em; text-transform: uppercase;
+            color: var(--gold-dim); margin: 0 0 18px; display: flex; align-items: center; gap: 12px;
+        }
+        .block > h2::after { content: ""; flex: 1; height: 1px; background: var(--edge); }
+        .summary { color: var(--muted); font-size: 0.97rem; margin: 0; max-width: 72ch; }
+
+        .skills { display: grid; gap: 14px; }
+        .skline { display: grid; grid-template-columns: 150px 1fr; gap: 14px; align-items: start; }
+        .skline .lab { font-family: var(--mono); font-size: 0.72rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--faint); padding-top: 4px; }
+        .chips { display: flex; flex-wrap: wrap; gap: 7px; }
+        .chip { font-family: var(--mono); font-size: 0.74rem; color: var(--parchment); background: var(--edge-soft); border: 1px solid var(--edge); padding: 4px 10px; border-radius: 2px; }
+
+        .job { padding: 0 0 24px; }
+        .job:last-child { padding-bottom: 0; }
+        .job-head { display: flex; justify-content: space-between; align-items: baseline; gap: 14px; flex-wrap: wrap; }
+        .job-head h3 { font-family: var(--display); font-weight: 600; font-size: 1.22rem; margin: 0; color: var(--parchment); }
+        .job-head .when { font-family: var(--mono); font-size: 0.76rem; letter-spacing: 0.08em; color: var(--gold-dim); white-space: nowrap; }
+        .job .org { font-family: var(--mono); font-size: 0.82rem; color: var(--muted); margin: 3px 0 0; }
+        .job ul { margin: 13px 0 0; padding: 0; list-style: none; display: grid; gap: 8px; }
+        .job ul li { position: relative; padding-left: 19px; color: var(--muted); font-size: 0.94rem; }
+        .job ul li::before { content: ""; position: absolute; left: 0; top: 9px; width: 6px; height: 6px; background: var(--gold-dim); transform: rotate(45deg); }
+
+        .proj { padding: 0 0 18px; }
+        .proj:last-child { padding-bottom: 0; }
+        .proj h3 { font-family: var(--display); font-weight: 600; font-size: 1.06rem; margin: 0 0 4px; color: var(--parchment); }
+        .proj p { margin: 0; color: var(--muted); font-size: 0.93rem; }
+        .proj p .impact-tag { color: var(--gold-bright); }
+
+        .twoup { display: grid; grid-template-columns: 1fr 1fr; gap: 30px; }
+        .cred-line { color: var(--parchment); font-size: 0.95rem; }
+        .cred-line + .cred-line { margin-top: 12px; }
+        .cred-line small { display: block; color: var(--muted); font-size: 0.84rem; margin-top: 2px; }
+
+        @media (max-width: 620px) { .skline { grid-template-columns: 1fr; gap: 6px; } .twoup { grid-template-columns: 1fr; gap: 24px; } }
+
+        @media print {
+            @page { margin: 14mm; }
+            body { background: #fff; color: #14110b; }
+            .toolbar { display: none; }
+            .sheet { box-shadow: none; border: none; border-radius: 0; margin: 0; padding: 0; max-width: 100%; background: #fff; }
+            .head, .skline, .job, .proj, section.block { break-inside: avoid; }
+            .head { border-color: #cdbfa3; }
+            .head h1, .job-head h3, .proj h3, .job-head .when, .cred-line { color: #14110b; }
+            .head .role, .block > h2, .proj p .impact-tag { color: #8a6e3a; }
+            .summary, .contact, .job .org, .job ul li, .proj p, .cred-line small, .skline .lab { color: #4a4334; }
+            .block > h2::after { background: #d8cbb0; }
+            .chip { background: #f2ecde; border-color: #d8cbb0; color: #2a2419; }
+            .job ul li::before { background: #8a6e3a; }
+            a { color: #14110b !important; text-decoration: none; }
+        }
+    </style>
+</head>
+<body>
+
+<div class="toolbar">
+    <a href="portfolio.html">← Back to portfolio</a>
+    <button onclick="window.print()">Print / Save as PDF ↧</button>
+</div>
+
+<main class="sheet">
+    <header class="head">
+        <h1>Jermaine Nathaniel Chase</h1>
+        <p class="role">Senior Full Stack Software Engineer</p>
+        <div class="contact">
+            <span>Durham, NC</span>
+            <!--<a href="tel:+19197237982">919.723.7982</a>-->
+            <a href="mailto:jermainenchase@gmail.com">jermainenchase@gmail.com</a>
+            <a href="https://www.linkedin.com/in/jermainenchase/" target="_blank" rel="noopener">linkedin.com/in/jermainenchase</a>
+        </div>
+    </header>
+
+    <section class="block">
+        <h2>Professional Summary</h2>
+        <p class="summary">Senior Full-Stack Software Engineer with nearly 20 years of experience designing, developing, and modernizing enterprise software across the healthcare and federal-government sectors. Experienced in Java, Spring Boot, Angular, RESTful APIs, cloud-native development, and Agile delivery, with a proven ability to modernize legacy systems, design scalable architectures, and quickly become a trusted contributor.</p>
+    </section>
+
+    <section class="block">
+        <h2>Technical Skills</h2>
+        <div class="skills">
+            <div class="skline"><span class="lab">Languages</span><div class="chips"><span class="chip">Java</span><span class="chip">SQL</span><span class="chip">JavaScript</span><span class="chip">TypeScript</span><span class="chip">HTML5</span><span class="chip">CSS3</span><span class="chip">JSP</span><span class="chip">Kotlin</span></div></div>
+            <div class="skline"><span class="lab">Frameworks</span><div class="chips"><span class="chip">Spring Boot</span><span class="chip">Spring MVC</span><span class="chip">Spring Security</span><span class="chip">Angular</span><span class="chip">REST APIs</span><span class="chip">JPA / Hibernate</span><span class="chip">JUnit</span><span class="chip">Node.js</span><span class="chip">jQuery</span></div></div>
+            <div class="skline"><span class="lab">Cloud &amp; DevOps</span><div class="chips"><span class="chip">AWS</span><span class="chip">Docker</span><span class="chip">OpenShift</span><span class="chip">Jenkins</span><span class="chip">Git</span><span class="chip">Maven</span><span class="chip">CI/CD</span></div></div>
+            <div class="skline"><span class="lab">Practices</span><div class="chips"><span class="chip">Agile Scrum</span><span class="chip">Microservices</span><span class="chip">Object-Oriented Design</span><span class="chip">REST API Design</span><span class="chip">Software Architecture</span></div></div>
+        </div>
+    </section>
+
+    <section class="block">
+        <h2>Professional Experience</h2>
+
+        <div class="job">
+            <div class="job-head"><h3>Software Engineer</h3><span class="when">2026 — Present</span></div>
+            <p class="org">CACI International</p>
+            <ul>
+                <li>Rebuilding the Resource Management Portal (RMP), replacing a ServiceNow implementation with Java, Spring Boot, and Angular 22.</li>
+                <li>Designed the application's audit-history architecture and collaborated on a centralized auditing framework.</li>
+                <li>Designed and implemented a reusable user-preference persistence framework.</li>
+                <li>Participate in Agile planning, code reviews, testing, and feature delivery.</li>
+                <li>Became a productive contributor within the first month and assist onboarding new developers.</li>
+            </ul>
+        </div>
+
+        <div class="job">
+            <div class="job-head"><h3>Senior Java Developer</h3><span class="when">2016 — 2026</span></div>
+            <p class="org">Blue Cross NC</p>
+            <ul>
+                <li>Architected enterprise enrollment and agent-portal applications.</li>
+                <li>Led the migration from Struts to Spring Boot microservices on OpenShift.</li>
+                <li>Designed REST APIs and integrated USPS and Smarty services.</li>
+                <li>Resolved production issues and mentored junior developers.</li>
+            </ul>
+        </div>
+
+        <div class="job">
+            <div class="job-head"><h3>Java Developer</h3><span class="when">2011 — 2016</span></div>
+            <p class="org">Blue Cross NC</p>
+            <ul>
+                <li>Developed enterprise Java applications and modernization initiatives.</li>
+            </ul>
+        </div>
+
+        <div class="job">
+            <div class="job-head"><h3>Associate Java Developer</h3><span class="when">2007 — 2011</span></div>
+            <p class="org">Blue Cross NC</p>
+            <ul>
+                <li>Developed the MAGIC CRM platform and SOAP integrations.</li>
+            </ul>
+        </div>
+    </section>
+
+    <section class="block">
+        <h2>Projects</h2>
+        <div class="proj">
+            <h3>Enterprise Audit Framework</h3>
+            <p>Designed the audit architecture and a reusable audit framework. <span class="impact-tag">Centralized, consistent audit trails across the application.</span></p>
+        </div>
+        <div class="proj">
+            <h3>User Preference Framework</h3>
+            <p>Designed a reusable preference-persistence solution. <span class="impact-tag">Drop-in personalization for any module.</span></p>
+        </div>
+        <div class="proj">
+            <h3>PDF Management Automation Tool</h3>
+            <p>Automated rotation, renaming, and validation of marketing PDFs. <span class="impact-tag">Reduced a 2.5-day manual process to five minutes.</span></p>
+        </div>
+        <div class="proj">
+            <h3>Staffing Error Identification Utility</h3>
+            <p>A workforce-management utility for 600 agents across 200 skills. <span class="impact-tag">Caught mis-allocations before they reached the floor.</span></p>
+        </div>
+    </section>
+
+    <section class="block">
+        <div class="twoup">
+            <div>
+                <h2>Certifications</h2>
+                <div class="cred-line">AWS Certified Cloud Practitioner</div>
+            </div>
+            <div>
+                <h2>Education</h2>
+                <div class="cred-line">B.S. Mathematics<small>CUNY — Medgar Evers College</small></div>
+                <div class="cred-line">A.S. Computer Science<small>CUNY — Medgar Evers College</small></div>
+            </div>
+        </div>
+    </section>
+</main>
+
+</body>
+</html>
