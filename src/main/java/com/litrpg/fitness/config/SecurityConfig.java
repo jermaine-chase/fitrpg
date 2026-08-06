@@ -1,52 +1,54 @@
 package com.litrpg.fitness.config;
 
-import org.springframework.beans.factory.annotation.Value;
+import com.litrpg.fitness.security.JwtAuthenticationFilter;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
-import org.springframework.security.core.userdetails.User;
-import org.springframework.security.core.userdetails.UserDetails;
-import org.springframework.security.core.userdetails.UserDetailsService;
-import org.springframework.security.provisioning.InMemoryUserDetailsManager;
+import org.springframework.security.config.http.SessionCreationPolicy;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 
 /**
- * Locks down {@code /api/admin/**} behind HTTP Basic Auth.
- * All other endpoints remain open (the game API has no per-user auth).
+ * A single auth mechanism — JWT bearer tokens for player accounts (see
+ * {@code /api/auth/**} and {@link JwtAuthenticationFilter}) — guards both
+ * {@code /api/character/**}/{@code /api/friends/**} (any authenticated
+ * player) and {@code /api/admin/**} (only accounts with the admin role,
+ * granted via the token's {@code admin} claim). Everything else remains open.
  */
 @Configuration
 @EnableWebSecurity
 public class SecurityConfig {
 
     @Bean
-    public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
+    public SecurityFilterChain filterChain(HttpSecurity http,
+                                            JwtAuthenticationFilter jwtAuthenticationFilter) throws Exception {
         return http
                 // Delegate CORS to the WebMvcConfigurer in WebConfig.
                 .cors(Customizer.withDefaults())
                 // REST API — CSRF does not apply.
                 .csrf(AbstractHttpConfigurer::disable)
+                .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/api/admin/**").authenticated()
+                        .requestMatchers("/api/auth/logout").authenticated()
+                        .requestMatchers("/api/auth/security-question").authenticated()
+                        .requestMatchers("/api/auth/me").authenticated()
+                        .requestMatchers("/api/auth/**").permitAll()
+                        .requestMatchers("/api/admin/**").hasRole("ADMIN")
+                        .requestMatchers("/api/character/**").authenticated()
+                        .requestMatchers("/api/friends/**").authenticated()
                         .anyRequest().permitAll()
                 )
-                .httpBasic(Customizer.withDefaults())
+                .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
                 .build();
     }
 
     @Bean
-    public UserDetailsService userDetailsService(
-            @Value("${admin.username}") String username,
-            @Value("${admin.password}") String password) {
-
-        UserDetails admin = User.builder()
-                .username(username)
-                // {noop} tells Spring Security the password is stored in plain text.
-                .password("{noop}" + password)
-                .roles("ADMIN")
-                .build();
-        return new InMemoryUserDetailsManager(admin);
+    public PasswordEncoder passwordEncoder() {
+        return new BCryptPasswordEncoder();
     }
 }

@@ -2,6 +2,8 @@ package com.litrpg.fitness.model;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
@@ -37,6 +39,10 @@ public class WorkoutLog {
 
     @Column(name = "quest_title")
     private String questTitle;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "stat_type", length = 3)
+    private StatType statType;
 
     @Column(name = "base_xp_earned")
     private int baseXpEarned;
@@ -92,6 +98,14 @@ public class WorkoutLog {
 
     public void setQuestTitle(String questTitle) {
         this.questTitle = questTitle;
+    }
+
+    public StatType getStatType() {
+        return statType;
+    }
+
+    public void setStatType(StatType statType) {
+        this.statType = statType;
     }
 
     public int getBaseXpEarned() {

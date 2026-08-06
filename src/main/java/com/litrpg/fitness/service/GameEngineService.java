@@ -11,15 +11,19 @@ import com.litrpg.fitness.model.StatType;
 import com.litrpg.fitness.model.WorkoutLog;
 import com.litrpg.fitness.repository.CharacterRepository;
 import com.litrpg.fitness.repository.QuestRepository;
+import com.litrpg.fitness.repository.WorkoutLogRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Map;
@@ -77,11 +81,17 @@ public class GameEngineService {
 
     private final CharacterRepository characterRepository;
     private final QuestRepository questRepository;
+    private final WorkoutLogRepository workoutLogRepository;
+    private final DailyQuestService dailyQuestService;
 
     public GameEngineService(CharacterRepository characterRepository,
-                             QuestRepository questRepository) {
+                             QuestRepository questRepository,
+                             WorkoutLogRepository workoutLogRepository,
+                             DailyQuestService dailyQuestService) {
         this.characterRepository = characterRepository;
         this.questRepository = questRepository;
+        this.workoutLogRepository = workoutLogRepository;
+        this.dailyQuestService = dailyQuestService;
     }
 
     public int xpForNextLevel(int currentLevel) {
@@ -115,6 +125,14 @@ public class GameEngineService {
                 .orElseThrow(() -> new ResourceNotFoundException(
                         "Quest not found: " + questId));
 
+        LocalDate today = LocalDate.now();
+        boolean alreadyClaimedToday = workoutLogRepository.existsByCharacterIdAndQuestIdAndLoggedAtBetween(
+                characterId, questId, today.atStartOfDay(), today.atTime(LocalTime.MAX));
+        if (alreadyClaimedToday) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT,
+                    "Quest '" + questId + "' has already been claimed today");
+        }
+
         // 1. Level-based XP scale (applied to base XP before streak multiplier).
         double levelScale = GameFormulas.questXpScale(character.getCurrentLevel());
 
@@ -125,7 +143,6 @@ public class GameEngineService {
         int existingStreak = character.getStreakCount();
         double streakMultiplier = 1.0 + Math.min(existingStreak * STREAK_BONUS_PER_DAY, MAX_STREAK_BONUS);
 
-        LocalDate today = LocalDate.now();
         int updatedStreak = computeNewStreak(character.getLastWorkoutDate(), existingStreak, today);
         character.setStreakCount(updatedStreak);
         character.setLastWorkoutDate(today);
@@ -133,7 +150,16 @@ public class GameEngineService {
         int finalCharacterXp = (int) Math.round(scaledCharacterXp * streakMultiplier);
         int finalStatXp      = (int) Math.round(scaledStatXp      * streakMultiplier);
 
-        // 3. Random bonus challenge.
+        // 3. Daily Focus bonus — extra reward for claiming today's assigned quest.
+        int dailyFocusBonusXp = 0;
+        if (dailyQuestService.isTodaysDailyQuest(characterId, questId)) {
+            int preDailyTotal = finalCharacterXp + finalStatXp;
+            finalCharacterXp  = (int) Math.round(finalCharacterXp * DailyQuestService.DAILY_FOCUS_BONUS_MULTIPLIER);
+            finalStatXp       = (int) Math.round(finalStatXp      * DailyQuestService.DAILY_FOCUS_BONUS_MULTIPLIER);
+            dailyFocusBonusXp = (finalCharacterXp + finalStatXp) - preDailyTotal;
+        }
+
+        // 4. Random bonus challenge.
         BonusChallengeDTO bonusChallenge = null;
         if (ThreadLocalRandom.current().nextDouble() < BONUS_CHALLENGE_CHANCE) {
             List<String> prompts = BONUS_PROMPTS.get(quest.getTargetStat());
@@ -149,7 +175,7 @@ public class GameEngineService {
                     characterId, questId, prompt, bonusXp);
         }
 
-        // 4. Apply XP to character and stat.
+        // 5. Apply XP to character and stat.
         applyCharacterXp(character, finalCharacterXp);
 
         StatType targetStat = quest.getTargetStat();
@@ -160,10 +186,11 @@ public class GameEngineService {
                         "Stat " + targetStat + " not found for character " + characterId));
         applyStatXp(stat, finalStatXp);
 
-        // 5. Persist an immutable workout log (base reflects pre-streak scaled XP).
+        // 6. Persist an immutable workout log (base reflects pre-streak scaled XP).
         WorkoutLog logEntry = new WorkoutLog();
         logEntry.setQuestId(quest.getQuestId());
         logEntry.setQuestTitle(quest.getTitle());
+        logEntry.setStatType(targetStat);
         logEntry.setBaseXpEarned(scaledCharacterXp + scaledStatXp);
         logEntry.setMultiplierApplied(BigDecimal.valueOf(streakMultiplier).setScale(2, RoundingMode.HALF_UP));
         logEntry.setFinalXpAwarded(finalCharacterXp + finalStatXp);
@@ -176,7 +203,7 @@ public class GameEngineService {
                 levelScale, streakMultiplier,
                 finalCharacterXp + finalStatXp, updatedStreak);
 
-        return new ClaimRewardResponse(CharacterSheetResponse.from(saved), bonusChallenge);
+        return new ClaimRewardResponse(CharacterSheetResponse.from(saved), bonusChallenge, dailyFocusBonusXp);
     }
 
     /**

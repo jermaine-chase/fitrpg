@@ -4,8 +4,40 @@
 --  (spring.sql.init.mode=always). Every statement is idempotent.
 -- ===========================================================================
 
+CREATE TABLE IF NOT EXISTS users (
+    id                         UUID         PRIMARY KEY,
+    username                   VARCHAR(50)  NOT NULL,
+    password_hash              VARCHAR(255) NOT NULL,
+    created_at                 TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    default_friend_visibility  VARCHAR(20)  NOT NULL DEFAULT 'BASIC',
+    security_question          VARCHAR(255),
+    security_answer_hash       VARCHAR(255),
+    is_admin                   BOOLEAN      NOT NULL DEFAULT FALSE,
+    CONSTRAINT uq_users_username UNIQUE (username)
+);
+
+-- Add default_friend_visibility to existing users tables that predate friend visibility controls.
+ALTER TABLE users ADD COLUMN IF NOT EXISTS default_friend_visibility VARCHAR(20) NOT NULL DEFAULT 'BASIC';
+
+-- Add password-recovery security question to existing users tables that predate it.
+-- Nullable: accounts created before this feature (and anyone who skips setting one)
+-- simply have no self-service recovery path until they set a question.
+ALTER TABLE users ADD COLUMN IF NOT EXISTS security_question    VARCHAR(255);
+ALTER TABLE users ADD COLUMN IF NOT EXISTS security_answer_hash VARCHAR(255);
+
+-- Add the admin role to existing users tables that predate it.
+ALTER TABLE users ADD COLUMN IF NOT EXISTS is_admin BOOLEAN NOT NULL DEFAULT FALSE;
+
+-- One-time backfill for installs that already had accounts before the admin
+-- role existed: promote whichever account registered first, but only if no
+-- one is an admin yet (so this is a no-op on every later startup).
+UPDATE users SET is_admin = TRUE
+WHERE id = (SELECT id FROM users ORDER BY created_at ASC, id ASC LIMIT 1)
+AND NOT EXISTS (SELECT 1 FROM users WHERE is_admin = TRUE);
+
 CREATE TABLE IF NOT EXISTS characters (
     id                UUID         PRIMARY KEY,
+    user_id           UUID         REFERENCES users (id) ON DELETE CASCADE,
     character_name    VARCHAR(255) NOT NULL,
     current_level     INT          NOT NULL DEFAULT 1,
     overall_xp        INT          NOT NULL DEFAULT 0,
@@ -13,6 +45,9 @@ CREATE TABLE IF NOT EXISTS characters (
     last_workout_date DATE,
     created_at        TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
+
+-- Add user_id to existing characters tables that predate player accounts.
+ALTER TABLE characters ADD COLUMN IF NOT EXISTS user_id UUID REFERENCES users (id) ON DELETE CASCADE;
 
 CREATE TABLE IF NOT EXISTS character_stats (
     id            UUID        PRIMARY KEY,
@@ -29,10 +64,22 @@ CREATE TABLE IF NOT EXISTS workout_logs (
     character_id       UUID         NOT NULL REFERENCES characters (id) ON DELETE CASCADE,
     quest_id           VARCHAR(255),
     quest_title        VARCHAR(255),
+    stat_type          VARCHAR(3),
     base_xp_earned     INT,
     multiplier_applied NUMERIC(5, 2),
     final_xp_awarded   INT,
     logged_at          TIMESTAMP    NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Add stat_type to existing workout_logs tables that predate the per-stat dashboard.
+ALTER TABLE workout_logs ADD COLUMN IF NOT EXISTS stat_type VARCHAR(3);
+
+CREATE TABLE IF NOT EXISTS daily_quest_assignments (
+    id             UUID        PRIMARY KEY,
+    character_id   UUID        NOT NULL REFERENCES characters (id) ON DELETE CASCADE,
+    quest_id       VARCHAR(50) NOT NULL REFERENCES quests (quest_id) ON DELETE CASCADE,
+    assigned_date  DATE        NOT NULL,
+    CONSTRAINT uq_daily_quest_assignment UNIQUE (character_id, assigned_date)
 );
 
 CREATE TABLE IF NOT EXISTS quests (
@@ -124,6 +171,34 @@ VALUES
 
 ON CONFLICT (quest_id) DO NOTHING;
 
+CREATE TABLE IF NOT EXISTS friendships (
+    id                   UUID        PRIMARY KEY,
+    requester_id         UUID        NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+    addressee_id         UUID        NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+    status               VARCHAR(20) NOT NULL DEFAULT 'PENDING',
+    created_at           TIMESTAMP   NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    responded_at         TIMESTAMP,
+    requester_visibility VARCHAR(20),
+    addressee_visibility VARCHAR(20),
+    CONSTRAINT uq_friendship_pair UNIQUE (requester_id, addressee_id),
+    CONSTRAINT chk_friendship_not_self CHECK (requester_id <> addressee_id)
+);
+
+-- Add per-friendship visibility overrides to existing friendships tables.
+ALTER TABLE friendships ADD COLUMN IF NOT EXISTS requester_visibility VARCHAR(20);
+ALTER TABLE friendships ADD COLUMN IF NOT EXISTS addressee_visibility VARCHAR(20);
+
+-- JWTs logged out before their natural expiry. Rows are pruned once expires_at
+-- passes, since an expired token is rejected on that basis alone.
+CREATE TABLE IF NOT EXISTS revoked_tokens (
+    jti        VARCHAR(36) PRIMARY KEY,
+    expires_at TIMESTAMP   NOT NULL
+);
+
 -- Helpful secondary indexes for FK lookups.
 CREATE INDEX IF NOT EXISTS idx_character_stats_character_id ON character_stats (character_id);
 CREATE INDEX IF NOT EXISTS idx_workout_logs_character_id    ON workout_logs (character_id);
+CREATE INDEX IF NOT EXISTS idx_daily_quest_assignments_char ON daily_quest_assignments (character_id, assigned_date);
+CREATE INDEX IF NOT EXISTS idx_characters_user_id           ON characters (user_id);
+CREATE INDEX IF NOT EXISTS idx_friendships_requester_id     ON friendships (requester_id);
+CREATE INDEX IF NOT EXISTS idx_friendships_addressee_id     ON friendships (addressee_id);

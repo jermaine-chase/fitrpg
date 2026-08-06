@@ -1,16 +1,19 @@
 package com.litrpg.fitness.service;
 
 import com.litrpg.fitness.dto.AdminCharacterUpdateRequest;
+import com.litrpg.fitness.dto.WorkoutLogEntryResponse;
 import com.litrpg.fitness.exception.ResourceNotFoundException;
 import com.litrpg.fitness.model.Character;
 import com.litrpg.fitness.model.CharacterStat;
 import com.litrpg.fitness.model.StatType;
 import com.litrpg.fitness.repository.CharacterRepository;
+import com.litrpg.fitness.repository.WorkoutLogRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 /**
  * Character lifecycle operations that are not part of the core game loop:
@@ -20,33 +23,57 @@ import java.util.UUID;
 public class CharacterService {
 
     private final CharacterRepository characterRepository;
+    private final WorkoutLogRepository workoutLogRepository;
 
-    public CharacterService(CharacterRepository characterRepository) {
+    public CharacterService(CharacterRepository characterRepository, WorkoutLogRepository workoutLogRepository) {
         this.characterRepository = characterRepository;
+        this.workoutLogRepository = workoutLogRepository;
     }
 
     /**
-     * Creates a level-1 character and seeds all four stats so quest claims have
-     * a target to apply XP to.
+     * Creates a level-1 character owned by {@code userId} and seeds all four
+     * stats so quest claims have a target to apply XP to.
      */
     @Transactional
-    public Character createCharacter(String characterName) {
+    public Character createCharacter(String characterName, UUID userId) {
         Character character = new Character(characterName);
+        character.setUserId(userId);
         for (StatType type : StatType.values()) {
             character.addStat(new CharacterStat(type));
         }
         return characterRepository.save(character);
     }
 
+    /** Admin operation: fetch any character regardless of owner. */
     @Transactional(readOnly = true)
     public Character getCharacter(UUID id) {
         return characterRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Character not found: " + id));
     }
 
+    /**
+     * Fetches a character only if it is owned by {@code userId}; otherwise
+     * throws 404 (not 403) so ownership isn't leaked to unauthorized callers.
+     */
+    @Transactional(readOnly = true)
+    public Character getOwnedCharacter(UUID id, UUID userId) {
+        return characterRepository.findByIdAndUserId(id, userId)
+                .orElseThrow(() -> new ResourceNotFoundException("Character not found: " + id));
+    }
+
     @Transactional(readOnly = true)
     public List<Character> listCharacters() {
         return characterRepository.findAll();
+    }
+
+    /**
+     * Fetches the calling player's own character without needing to know its
+     * id up front — used by the login flow, which only has a user id.
+     */
+    @Transactional(readOnly = true)
+    public Character getMyCharacter(UUID userId) {
+        return characterRepository.findFirstByUserId(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("No character found for this account"));
     }
 
     /**
@@ -74,5 +101,24 @@ public class CharacterService {
             throw new ResourceNotFoundException("Character not found: " + id);
         }
         characterRepository.deleteById(id);
+    }
+
+    /** Owner-scoped delete: 404s instead of deleting a character owned by someone else. */
+    @Transactional
+    public void deleteOwnedCharacter(UUID id, UUID userId) {
+        Character character = getOwnedCharacter(id, userId);
+        characterRepository.delete(character);
+    }
+
+    /**
+     * The calling player's own claim history, most recent first — powers the
+     * progress dashboard's XP-over-time and per-stat charts.
+     */
+    @Transactional(readOnly = true)
+    public List<WorkoutLogEntryResponse> getOwnedWorkoutHistory(UUID id, UUID userId) {
+        getOwnedCharacter(id, userId);
+        return workoutLogRepository.findByCharacterIdOrderByLoggedAtDesc(id).stream()
+                .map(WorkoutLogEntryResponse::from)
+                .collect(Collectors.toList());
     }
 }
