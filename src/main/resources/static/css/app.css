@@ -158,6 +158,16 @@
   .abandon:hover { color: var(--danger); border-color: rgba(255, 94, 94, 0.45); }
 
   /* ---- quest board -------------------------------------------------------- */
+  .tag-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
+  .tag-chip {
+    font-family: var(--font-mono); font-size: 11px; letter-spacing: 1px; text-transform: uppercase;
+    padding: 5px 10px; border-radius: 99px; cursor: pointer; user-select: none;
+    border: 1px solid var(--border); color: var(--dim); background: var(--inset);
+    transition: all 0.15s ease;
+  }
+  .tag-chip:hover { border-color: var(--border-bright); color: var(--text); }
+  .tag-chip.active { border-color: var(--cyan); color: var(--cyan); background: rgba(111,231,245,0.08); }
+
   .quest-list { display: flex; flex-direction: column; gap: 8px; max-height: 520px; overflow-y: auto; padding-right: 4px; }
   .quest-list::-webkit-scrollbar { width: 6px; }
   .quest-list::-webkit-scrollbar-thumb { background: var(--border-bright); border-radius: 99px; }

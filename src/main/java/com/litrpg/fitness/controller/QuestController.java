@@ -1,6 +1,8 @@
 package com.litrpg.fitness.controller;
 
 import com.litrpg.fitness.dto.QuestDTO;
+import com.litrpg.fitness.model.Quest;
+import com.litrpg.fitness.model.QuestTag;
 import com.litrpg.fitness.repository.QuestRepository;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -26,21 +28,32 @@ public class QuestController {
 
     /**
      * Returns available quests, optionally filtered to those unlocked at a
-     * given character level.
+     * given character level and/or a category chip.
      *
      * <ul>
      *   <li>{@code GET /api/quests} — all quests</li>
      *   <li>{@code GET /api/quests?level=15} — quests with min_level &lt;= 15</li>
+     *   <li>{@code GET /api/quests?tag=CARDIO} — quests tagged CARDIO</li>
+     *   <li>{@code GET /api/quests?level=15&tag=CARDIO} — both filters combined</li>
      * </ul>
      */
     @GetMapping
     public ResponseEntity<List<QuestDTO>> listQuests(
-            @RequestParam(name = "level", required = false) Integer level) {
+            @RequestParam(name = "level", required = false) Integer level,
+            @RequestParam(name = "tag", required = false) QuestTag tag) {
 
-        List<QuestDTO> quests = (level != null
-                ? questRepository.findByMinLevelLessThanEqual(level)
-                : questRepository.findAll())
-                .stream()
+        List<Quest> matched;
+        if (level != null && tag != null) {
+            matched = questRepository.findByMinLevelLessThanEqualAndTag(level, tag);
+        } else if (level != null) {
+            matched = questRepository.findByMinLevelLessThanEqual(level);
+        } else if (tag != null) {
+            matched = questRepository.findByTag(tag);
+        } else {
+            matched = questRepository.findAll();
+        }
+
+        List<QuestDTO> quests = matched.stream()
                 .map(QuestDTO::from)
                 .collect(Collectors.toList());
 

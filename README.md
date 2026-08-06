@@ -38,7 +38,11 @@ com.litrpg.fitness
 - **Character** — a level-1-start avatar with overall level/XP, a login
   streak, and four independently-leveled stats: `STR`, `DEX`, `CON`, `WIL`.
 - **Quest** — an admin-curated catalog of tasks gated by `minLevel` and tied
-  to a target stat. "Logging a workout" means claiming a quest.
+  to a target stat. "Logging a workout" means claiming a quest. Each quest
+  may carry an optional category `tag` (`QUICK`, `INTENSE`, `RECOVERY`,
+  `STRENGTH`, `CARDIO`) and an optional `estimatedMinutes`, used for quest
+  board filter chips — both are nullable, so quests created before this
+  feature show up untagged rather than needing a backfill.
 - **WorkoutLog** — an immutable, append-only record of every claim (quest,
   stat trained, XP earned, streak multiplier applied), used for the progress
   dashboard and the friend activity feed.
@@ -226,8 +230,10 @@ curl http://localhost:8080/api/character/{id}/daily -H "Authorization: Bearer $T
 # Claim history, most recent first
 curl http://localhost:8080/api/character/{id}/history -H "Authorization: Bearer $TOKEN"
 
-# Quest catalog, optionally filtered to a level
+# Quest catalog, optionally filtered to a level and/or category tag
 curl "http://localhost:8080/api/quests?level=10"
+curl "http://localhost:8080/api/quests?tag=CARDIO"
+curl "http://localhost:8080/api/quests?level=10&tag=CARDIO"
 ```
 
 `GET` and `claim` both return the character sheet:

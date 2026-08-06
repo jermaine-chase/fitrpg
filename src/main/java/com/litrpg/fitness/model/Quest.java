@@ -34,6 +34,13 @@ public class Quest {
     @Column(name = "min_level", nullable = false)
     private int minLevel = 1;
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "tag", length = 20)
+    private QuestTag tag;
+
+    @Column(name = "estimated_minutes")
+    private Integer estimatedMinutes;
+
     public Quest() {
     }
 
@@ -91,5 +98,21 @@ public class Quest {
 
     public void setMinLevel(int minLevel) {
         this.minLevel = minLevel;
+    }
+
+    public QuestTag getTag() {
+        return tag;
+    }
+
+    public void setTag(QuestTag tag) {
+        this.tag = tag;
+    }
+
+    public Integer getEstimatedMinutes() {
+        return estimatedMinutes;
+    }
+
+    public void setEstimatedMinutes(Integer estimatedMinutes) {
+        this.estimatedMinutes = estimatedMinutes;
     }
 }

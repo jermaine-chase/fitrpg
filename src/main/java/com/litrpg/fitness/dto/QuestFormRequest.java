@@ -1,9 +1,11 @@
 package com.litrpg.fitness.dto;
 
+import com.litrpg.fitness.model.QuestTag;
 import com.litrpg.fitness.model.StatType;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Positive;
 import jakarta.validation.constraints.PositiveOrZero;
 
 /**
@@ -30,6 +32,11 @@ public class QuestFormRequest {
 
     @Min(1)
     private int minLevel = 1;
+
+    private QuestTag tag;
+
+    @Positive
+    private Integer estimatedMinutes;
 
     public String getQuestId() {
         return questId;
@@ -85,5 +92,21 @@ public class QuestFormRequest {
 
     public void setMinLevel(int minLevel) {
         this.minLevel = minLevel;
+    }
+
+    public QuestTag getTag() {
+        return tag;
+    }
+
+    public void setTag(QuestTag tag) {
+        this.tag = tag;
+    }
+
+    public Integer getEstimatedMinutes() {
+        return estimatedMinutes;
+    }
+
+    public void setEstimatedMinutes(Integer estimatedMinutes) {
+        this.estimatedMinutes = estimatedMinutes;
     }
 }

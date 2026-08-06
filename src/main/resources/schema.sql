@@ -95,6 +95,10 @@ CREATE TABLE IF NOT EXISTS quests (
 -- Add min_level to existing quests tables that were created before this column existed.
 ALTER TABLE quests ADD COLUMN IF NOT EXISTS min_level INT NOT NULL DEFAULT 1;
 
+-- Add the category chip + optional time estimate used by the quest-board filter chips.
+ALTER TABLE quests ADD COLUMN IF NOT EXISTS tag VARCHAR(20);
+ALTER TABLE quests ADD COLUMN IF NOT EXISTS estimated_minutes INT;
+
 -- Seed quests (idempotent via ON CONFLICT DO NOTHING).
 -- Tier 1 — available from level 1
 INSERT INTO quests (quest_id, title, description, target_stat, base_character_xp, base_stat_xp, min_level)
@@ -170,6 +174,31 @@ VALUES
         'WIL', 320, 380, 50)
 
 ON CONFLICT (quest_id) DO NOTHING;
+
+-- One-time backfill of tag/estimated_minutes for the seed quests above, for
+-- installs that already had these rows before the columns existed. Guarded by
+-- "tag IS NULL" so it never overwrites an admin's later edits.
+UPDATE quests SET tag = 'CARDIO',    estimated_minutes = 30  WHERE quest_id = 'Q-1001' AND tag IS NULL;
+UPDATE quests SET tag = 'STRENGTH',  estimated_minutes = 45  WHERE quest_id = 'Q-1002' AND tag IS NULL;
+UPDATE quests SET tag = 'RECOVERY',  estimated_minutes = 30  WHERE quest_id = 'Q-1003' AND tag IS NULL;
+UPDATE quests SET tag = 'RECOVERY',  estimated_minutes = 15  WHERE quest_id = 'Q-1004' AND tag IS NULL;
+UPDATE quests SET tag = 'INTENSE',   estimated_minutes = 20  WHERE quest_id = 'Q-1005' AND tag IS NULL;
+UPDATE quests SET tag = 'CARDIO',    estimated_minutes = 90  WHERE quest_id = 'Q-1006' AND tag IS NULL;
+UPDATE quests SET tag = 'STRENGTH',  estimated_minutes = 50  WHERE quest_id = 'Q-1007' AND tag IS NULL;
+UPDATE quests SET tag = 'INTENSE',   estimated_minutes = 10  WHERE quest_id = 'Q-1008' AND tag IS NULL;
+UPDATE quests SET tag = 'CARDIO',    estimated_minutes = 55  WHERE quest_id = 'Q-2001' AND tag IS NULL;
+UPDATE quests SET tag = 'STRENGTH',  estimated_minutes = 60  WHERE quest_id = 'Q-2002' AND tag IS NULL;
+UPDATE quests SET tag = 'RECOVERY',  estimated_minutes = 60  WHERE quest_id = 'Q-2003' AND tag IS NULL;
+UPDATE quests SET tag = 'RECOVERY',  estimated_minutes = 55  WHERE quest_id = 'Q-2004' AND tag IS NULL;
+UPDATE quests SET tag = 'INTENSE',   estimated_minutes = 35  WHERE quest_id = 'Q-2005' AND tag IS NULL;
+UPDATE quests SET tag = 'CARDIO',    estimated_minutes = 130 WHERE quest_id = 'Q-3001' AND tag IS NULL;
+UPDATE quests SET tag = 'STRENGTH',  estimated_minutes = 75  WHERE quest_id = 'Q-3002' AND tag IS NULL;
+UPDATE quests SET tag = 'INTENSE',   estimated_minutes = 45  WHERE quest_id = 'Q-3003' AND tag IS NULL;
+UPDATE quests SET tag = 'RECOVERY',  estimated_minutes = 60  WHERE quest_id = 'Q-3004' AND tag IS NULL;
+UPDATE quests SET tag = 'CARDIO',    estimated_minutes = 300 WHERE quest_id = 'Q-4001' AND tag IS NULL;
+UPDATE quests SET tag = 'STRENGTH',  estimated_minutes = 120 WHERE quest_id = 'Q-4002' AND tag IS NULL;
+UPDATE quests SET tag = 'INTENSE',   estimated_minutes = 30  WHERE quest_id = 'Q-4003' AND tag IS NULL;
+UPDATE quests SET tag = 'RECOVERY',  estimated_minutes = 90  WHERE quest_id = 'Q-4004' AND tag IS NULL;
 
 CREATE TABLE IF NOT EXISTS friendships (
     id                   UUID        PRIMARY KEY,

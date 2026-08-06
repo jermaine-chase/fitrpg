@@ -127,6 +127,7 @@
   .badge-con { color: var(--con); border: 1px solid rgba(246,161,60,0.35); background: rgba(246,161,60,0.07); }
   .badge-wil { color: var(--wil); border: 1px solid rgba(181,124,246,0.35); background: rgba(181,124,246,0.07); }
   .badge-tier { color: var(--amber); border: 1px solid rgba(240,169,59,0.35); background: rgba(240,169,59,0.07); }
+  .badge-tag  { color: var(--cyan);  border: 1px solid rgba(111,231,245,0.35); background: rgba(111,231,245,0.07); }
 
   .empty-row td { color: var(--faint); font-style: italic; text-align: center; padding: 28px; }
 

@@ -58,13 +58,14 @@
               <th>Description</th>
               <th>Stat</th>
               <th>Min Lvl</th>
+              <th>Tag</th>
               <th style="text-align:right">Char XP</th>
               <th style="text-align:right">Stat XP</th>
               <th style="text-align:right">Actions</th>
             </tr>
           </thead>
           <tbody id="questTbody">
-            <tr class="empty-row"><td colspan="8">Loading quests…</td></tr>
+            <tr class="empty-row"><td colspan="9">Loading quests…</td></tr>
           </tbody>
         </table>
       </div>
@@ -136,6 +137,21 @@
       <div class="field">
         <label for="qf-statxp">Base Stat XP</label>
         <input id="qf-statxp" type="number" min="0" value="50" />
+      </div>
+      <div class="field">
+        <label for="qf-tag">Category Tag</label>
+        <select id="qf-tag">
+          <option value="">— none —</option>
+          <option value="QUICK">Quick</option>
+          <option value="INTENSE">Intense</option>
+          <option value="RECOVERY">Recovery</option>
+          <option value="STRENGTH">Strength</option>
+          <option value="CARDIO">Cardio</option>
+        </select>
+      </div>
+      <div class="field">
+        <label for="qf-minutes">Estimated Minutes</label>
+        <input id="qf-minutes" type="number" min="1" placeholder="optional" />
       </div>
     </div>
     <div class="modal-err" id="questModalErr"></div>

@@ -1,6 +1,7 @@
 package com.litrpg.fitness.dto;
 
 import com.litrpg.fitness.model.Quest;
+import com.litrpg.fitness.model.QuestTag;
 import com.litrpg.fitness.model.StatType;
 
 /**
@@ -15,6 +16,8 @@ public class QuestDTO {
     private int baseCharacterXp;
     private int baseStatXp;
     private int minLevel;
+    private QuestTag tag;
+    private Integer estimatedMinutes;
 
     public static QuestDTO from(Quest quest) {
         QuestDTO dto = new QuestDTO();
@@ -25,6 +28,8 @@ public class QuestDTO {
         dto.baseCharacterXp = quest.getBaseCharacterXp();
         dto.baseStatXp = quest.getBaseStatXp();
         dto.minLevel = quest.getMinLevel();
+        dto.tag = quest.getTag();
+        dto.estimatedMinutes = quest.getEstimatedMinutes();
         return dto;
     }
 
@@ -54,5 +59,13 @@ public class QuestDTO {
 
     public int getMinLevel() {
         return minLevel;
+    }
+
+    public QuestTag getTag() {
+        return tag;
+    }
+
+    public Integer getEstimatedMinutes() {
+        return estimatedMinutes;
     }
 }

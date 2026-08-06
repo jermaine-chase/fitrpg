@@ -36,6 +36,7 @@ function setApiBase(value) {
 }
 const STAT_ORDER  = ['STR', 'DEX', 'CON', 'WIL'];
 const STAT_NAME   = { STR: 'Strength', DEX: 'Dexterity', CON: 'Constitution', WIL: 'Willpower' };
+const QUEST_TAGS  = ['QUICK', 'INTENSE', 'RECOVERY', 'STRENGTH', 'CARDIO'];
 
 const RANK_LABEL = minLevel => {
   if (minLevel >= 50) return 'B';
@@ -55,7 +56,7 @@ const todayStr        = () => { const d = new Date(); return `${d.getFullYear()}
 
 /* ========================== state ========================================= */
 let state = { char: null, history: [], daily: null, dailyBonusMultiplier: 1 };
-let ui    = { activeQuestId: null, checked: false, busy: false, pendingLevelUp: false };
+let ui    = { activeQuestId: null, checked: false, busy: false, pendingLevelUp: false, tagFilter: null };
 let quests = [];
 let prevStatPct = {};
 
@@ -136,7 +137,7 @@ const API = {
   claim:  (id, questId) => apiFetch(`/api/character/${id}/claim`, { method: 'POST', body: JSON.stringify({ questId }) }),
   history: id    => apiFetch(`/api/character/${id}/history`),
   daily:   id    => apiFetch(`/api/character/${id}/daily`),
-  quests: level  => apiFetch('/api/quests?level=' + level),
+  quests: (level, tag) => apiFetch('/api/quests?level=' + level + (tag ? '&tag=' + encodeURIComponent(tag) : '')),
   remove: id     => apiFetch('/api/character/' + id, { method: 'DELETE' }),
 
   friends:          () => apiFetch('/api/friends'),
@@ -156,13 +157,29 @@ const API = {
 /* ========================== quest loading ================================= */
 async function loadQuests(level) {
   try {
-    quests = await API.quests(level);
+    quests = await API.quests(level, ui.tagFilter);
     if (ui.activeQuestId && !quests.find(q => q.questId === ui.activeQuestId)) {
       ui.activeQuestId = null;
     }
   } catch (_) {
     quests = [];
   }
+}
+
+async function setTagFilter(tag) {
+  ui.tagFilter = ui.tagFilter === tag ? null : tag;
+  await loadQuests(state.char.currentLevel);
+  render();
+}
+
+function renderTagChips() {
+  const el = $('#tagChips'); if (!el) return;
+  el.innerHTML = QUEST_TAGS.map(tag =>
+    `<span class="tag-chip ${ui.tagFilter === tag ? 'active' : ''}" data-tag="${tag}">${tag}</span>`
+  ).join('');
+  el.querySelectorAll('.tag-chip').forEach(chip => {
+    chip.addEventListener('click', () => setTagFilter(chip.dataset.tag));
+  });
 }
 
 /* ========================== admin link visibility =========================== */
@@ -295,7 +312,7 @@ function markDone(charId, questId) {
 }
 
 /* ========================== rendering ===================================== */
-function render() { renderHud(); renderStats(); renderQuestBoard(); renderLog(); renderProgress(); }
+function render() { renderHud(); renderStats(); renderTagChips(); renderQuestBoard(); renderLog(); renderProgress(); }
 
 function renderHud() {
   const c = state.char; if (!c) return;
@@ -375,7 +392,9 @@ function renderStats() {
 function renderQuestBoard() {
   const c = state.char;
   if (!c || quests.length === 0) {
-    $('#questList').innerHTML = '<p class="quest-empty">No quests available — check API connection.</p>';
+    $('#questList').innerHTML = ui.tagFilter
+      ? `<p class="quest-empty">No ${esc(ui.tagFilter)} quests unlocked yet.</p>`
+      : '<p class="quest-empty">No quests available — check API connection.</p>';
     return;
   }
 
@@ -397,9 +416,10 @@ function renderQuestBoard() {
       <div class="qcard ${isActive ? 'is-active' : ''} ${cleared ? 'is-cleared' : ''} ${isDaily ? 'is-daily' : ''}" data-qid="${esc(q.questId)}">
         <div class="qcard__header">
           <span class="qcard__rank c-${lc}">${rank}·${q.targetStat}</span>
+          ${q.tag ? `<span class="tag-chip" style="cursor:default;">${esc(q.tag)}</span>` : ''}
           ${isDaily ? '<span class="daily-badge" title="Bonus XP for completing today\'s Daily Focus">★ Daily Focus</span>' : ''}
           <span class="qcard__title">${esc(q.title)}</span>
-          <span class="qcard__meta">~${estStat+estChar} XP</span>
+          <span class="qcard__meta">${q.estimatedMinutes ? `~${q.estimatedMinutes}min · ` : ''}~${estStat+estChar} XP</span>
           <span class="qcard__chevron">▾</span>
         </div>
         <div class="qcard__body">

@@ -94,17 +94,18 @@ async function loadQuests() {
   try {
     const quests = await adminFetch('/api/admin/quests');
     if (quests.length === 0) {
-      tbody.innerHTML = '<tr class="empty-row"><td colspan="8">No quests found.</td></tr>';
+      tbody.innerHTML = '<tr class="empty-row"><td colspan="9">No quests found.</td></tr>';
       return;
     }
     tbody.innerHTML = quests.map(q => {
       const lc = (q.targetStat || '').toLowerCase();
-      return `<tr data-qid="${esc(q.questId)}">
+      return `<tr data-qid="${esc(q.questId)}" data-tag="${esc(q.tag || '')}" data-minutes="${q.estimatedMinutes || ''}" data-minlevel="${q.minLevel}">
         <td class="td-id">${esc(q.questId)}</td>
         <td class="td-title">${esc(q.title)}</td>
         <td class="td-desc">${esc(q.description || '—')}</td>
         <td><span class="badge badge-${lc}">${esc(q.targetStat)}</span></td>
         <td><span class="badge badge-tier">Tier ${tierLabel(q.minLevel)}</span> <span style="color:var(--dim);font-size:11px">≥${q.minLevel}</span></td>
+        <td>${q.tag ? `<span class="badge badge-tag">${esc(q.tag)}</span>` : '<span style="color:var(--faint)">—</span>'}${q.estimatedMinutes ? ` <span style="color:var(--dim);font-size:11px">${q.estimatedMinutes}m</span>` : ''}</td>
         <td class="td-num">${q.baseCharacterXp}</td>
         <td class="td-num">${q.baseStatXp}</td>
         <td class="td-acts">
@@ -116,7 +117,7 @@ async function loadQuests() {
     tbody.querySelectorAll('.q-edit').forEach(btn => btn.addEventListener('click', () => openQuestModal('edit', btn.dataset.qid)));
     tbody.querySelectorAll('.q-del').forEach(btn  => btn.addEventListener('click', () => deleteQuest(btn.dataset.qid, btn.dataset.title)));
   } catch (e) {
-    tbody.innerHTML = `<tr class="empty-row"><td colspan="8">Error loading quests: ${esc(e.message)}</td></tr>`;
+    tbody.innerHTML = `<tr class="empty-row"><td colspan="9">Error loading quests: ${esc(e.message)}</td></tr>`;
   }
 }
 
@@ -142,6 +143,8 @@ function openQuestModal(mode, questId) {
     $('#qf-minlevel').value = '1';
     $('#qf-charxp').value   = '50';
     $('#qf-statxp').value   = '50';
+    $('#qf-tag').value      = '';
+    $('#qf-minutes').value  = '';
   } else {
     const row = document.querySelector(`[data-qid="${CSS.escape(questId)}"]`);
     if (!row) return;
@@ -151,10 +154,11 @@ function openQuestModal(mode, questId) {
     $('#qf-title').value    = cells[1].textContent;
     $('#qf-desc').value     = cells[2].textContent === '—' ? '' : cells[2].textContent;
     $('#qf-stat').value     = row.querySelector('.badge').textContent;
-    const minLevelText      = row.querySelector('[style*="color:var(--dim"]');
-    $('#qf-minlevel').value = minLevelText ? minLevelText.textContent.replace('≥','') : '1';
-    $('#qf-charxp').value   = cells[5].textContent;
-    $('#qf-statxp').value   = cells[6].textContent;
+    $('#qf-minlevel').value = row.dataset.minlevel || '1';
+    $('#qf-charxp').value   = cells[6].textContent;
+    $('#qf-statxp').value   = cells[7].textContent;
+    $('#qf-tag').value      = row.dataset.tag || '';
+    $('#qf-minutes').value  = row.dataset.minutes || '';
   }
   $('#questOverlay').classList.add('show');
   $('#qf-title').focus();
@@ -170,6 +174,8 @@ async function saveQuest() {
     minLevel:         parseInt($('#qf-minlevel').value, 10) || 1,
     baseCharacterXp:  parseInt($('#qf-charxp').value, 10)  || 0,
     baseStatXp:       parseInt($('#qf-statxp').value, 10)  || 0,
+    tag:              $('#qf-tag').value || null,
+    estimatedMinutes: $('#qf-minutes').value ? parseInt($('#qf-minutes').value, 10) : null,
   };
   if (!body.title)   { $('#questModalErr').textContent = 'Title is required.'; return; }
   if (questModalMode === 'create' && !body.questId) { $('#questModalErr').textContent = 'Quest ID is required.'; return; }

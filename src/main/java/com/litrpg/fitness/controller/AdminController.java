@@ -126,6 +126,8 @@ public class AdminController {
         quest.setBaseCharacterXp(req.getBaseCharacterXp());
         quest.setBaseStatXp(req.getBaseStatXp());
         quest.setMinLevel(req.getMinLevel());
+        quest.setTag(req.getTag());
+        quest.setEstimatedMinutes(req.getEstimatedMinutes());
         return quest;
     }
 }
