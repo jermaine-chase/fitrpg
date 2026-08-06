@@ -52,6 +52,11 @@ ALTER TABLE characters ADD COLUMN IF NOT EXISTS user_id UUID REFERENCES users (i
 -- Grace tokens that preserve a streak on a missed day instead of halving it.
 ALTER TABLE characters ADD COLUMN IF NOT EXISTS streak_freeze_count INT NOT NULL DEFAULT 1;
 
+-- Cosmetic-only customization: a picked avatar. No gameplay effect.
+-- (The equipped-title column is added further down, after the achievements
+-- table it references exists — see there.)
+ALTER TABLE characters ADD COLUMN IF NOT EXISTS avatar_id VARCHAR(30) NOT NULL DEFAULT 'wolf';
+
 CREATE TABLE IF NOT EXISTS character_stats (
     id            UUID        PRIMARY KEY,
     character_id  UUID        NOT NULL REFERENCES characters (id) ON DELETE CASCADE,
@@ -235,6 +240,12 @@ CREATE TABLE IF NOT EXISTS character_achievements (
 );
 
 CREATE INDEX IF NOT EXISTS idx_character_achievements_character_id ON character_achievements (character_id);
+
+-- Cosmetic-only equipped title, drawn from the character's own unlocked
+-- achievements (enforced in application code, not a DB constraint, since a
+-- character can equip at most the achievements *they* hold). Added here,
+-- after the achievements table it references.
+ALTER TABLE characters ADD COLUMN IF NOT EXISTS title_achievement_code VARCHAR(50) REFERENCES achievements (code) ON DELETE SET NULL;
 
 CREATE TABLE IF NOT EXISTS friendships (
     id                   UUID        PRIMARY KEY,

@@ -1,6 +1,7 @@
 package com.litrpg.fitness.controller;
 
 import com.litrpg.fitness.dto.AchievementResponse;
+import com.litrpg.fitness.dto.CharacterCustomizationRequest;
 import com.litrpg.fitness.dto.CharacterSheetResponse;
 import com.litrpg.fitness.dto.ClaimQuestRequest;
 import com.litrpg.fitness.dto.ClaimRewardResponse;
@@ -21,6 +22,7 @@ import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -141,6 +143,21 @@ public class CharacterController {
             @PathVariable UUID id) {
         characterService.getOwnedCharacter(id, principal.getId());
         return ResponseEntity.ok(achievementService.getCatalogForCharacter(id));
+    }
+
+    /**
+     * Sets the owned character's cosmetic avatar and equipped title (drawn
+     * from its own unlocked achievements). No gameplay effect.
+     * {@code PUT /api/character/{id}/customization}
+     */
+    @PutMapping("/{id}/customization")
+    public ResponseEntity<CharacterSheetResponse> updateCustomization(
+            @AuthenticationPrincipal UserPrincipal principal,
+            @PathVariable UUID id,
+            @Valid @RequestBody CharacterCustomizationRequest request) {
+        Character updated = characterService.updateCustomization(
+                id, principal.getId(), request.getAvatarId(), request.getTitleAchievementCode());
+        return ResponseEntity.ok(CharacterSheetResponse.from(updated));
     }
 
     /**

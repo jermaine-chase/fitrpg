@@ -23,10 +23,12 @@ com.litrpg.fitness
 ├── security     JwtService, JwtAuthenticationFilter, UserPrincipal — player JWT auth
 ├── model        User, Character, CharacterStat, WorkoutLog, Quest, QuestTag, StatType,
 │                DailyQuestAssignment, Friendship, FriendshipStatus, FriendVisibility,
-│                RevokedToken, Achievement, AchievementCriteriaType, CharacterAchievement
+│                RevokedToken, Achievement, AchievementCriteriaType, CharacterAchievement,
+│                LeaderboardScope, LeaderboardMetric
 ├── repository   JpaRepository interfaces
 ├── service      AuthService, GameEngineService, CharacterService, DailyQuestService,
-│                FriendService, MidnightDecayService, GameFormulas, AchievementService
+│                FriendService, MidnightDecayService, GameFormulas, AchievementService,
+│                LeaderboardService
 ├── dto          Auth/Character/Quest/Friend/DailyQuest request & response DTOs
 ├── controller   AuthController, CharacterController, QuestController,
 │                FriendController, AdminController, LeaderboardController
@@ -150,6 +152,19 @@ visibility level also gates the **activity feed**
 (`GET /api/friends/feed`), which surfaces friends' recent quest claims —
 `NONE` friends are omitted entirely, `BASIC` shows only that a claim
 happened, `FULL` shows the quest, stat, and XP earned.
+
+## Character customization
+
+Purely cosmetic, no gameplay effect: each `Character` has an `avatarId`
+(picked from a small starter catalog — `wolf`, `phoenix`, `serpent`, `golem`,
+`raven`, `tiger`, `owl`, `stag`, `fox`, `bear`, `hawk`, `turtle` — defaulting
+to `wolf`) and an optional `titleAchievementCode`, which must be the code of
+one of *that character's own* unlocked achievements (see Achievements
+above) or left unset. `PUT /api/character/{id}/customization`
+`{avatarId, titleAchievementCode}` sets both at once; leaving
+`titleAchievementCode` null/blank unequips any title. Both fields are
+returned on the character sheet. The frontend has an avatar picker and a
+title dropdown populated from the character's unlocked badges.
 
 ## Leaderboards
 

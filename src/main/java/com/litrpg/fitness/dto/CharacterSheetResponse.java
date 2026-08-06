@@ -27,6 +27,8 @@ public class CharacterSheetResponse {
     private int streakFreezesAvailable;
     private LocalDate lastWorkoutDate;
     private LocalDateTime createdAt;
+    private String avatarId;
+    private String titleAchievementCode;
     private List<StatResponse> stats;
 
     public static CharacterSheetResponse from(Character character) {
@@ -40,6 +42,8 @@ public class CharacterSheetResponse {
         r.streakFreezesAvailable = character.getStreakFreezeCount();
         r.lastWorkoutDate = character.getLastWorkoutDate();
         r.createdAt = character.getCreatedAt();
+        r.avatarId = character.getAvatarId();
+        r.titleAchievementCode = character.getTitleAchievementCode();
         r.stats = character.getStats().stream()
                 .sorted(Comparator.comparing(s -> s.getStatType().name()))
                 .map(StatResponse::from)
@@ -81,6 +85,14 @@ public class CharacterSheetResponse {
 
     public LocalDateTime getCreatedAt() {
         return createdAt;
+    }
+
+    public String getAvatarId() {
+        return avatarId;
+    }
+
+    public String getTitleAchievementCode() {
+        return titleAchievementCode;
     }
 
     public List<StatResponse> getStats() {

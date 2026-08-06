@@ -37,6 +37,10 @@ function setApiBase(value) {
 const STAT_ORDER  = ['STR', 'DEX', 'CON', 'WIL'];
 const STAT_NAME   = { STR: 'Strength', DEX: 'Dexterity', CON: 'Constitution', WIL: 'Willpower' };
 const QUEST_TAGS  = ['QUICK', 'INTENSE', 'RECOVERY', 'STRENGTH', 'CARDIO'];
+const AVATAR_EMOJI = {
+  wolf: '🐺', phoenix: '🔥', serpent: '🐍', golem: '🗿', raven: '🐦', tiger: '🐯',
+  owl: '🦉', stag: '🦌', fox: '🦊', bear: '🐻', hawk: '🦅', turtle: '🐢',
+};
 
 const RANK_LABEL = minLevel => {
   if (minLevel >= 50) return 'B';
@@ -138,6 +142,7 @@ const API = {
   history: id    => apiFetch(`/api/character/${id}/history`),
   achievements: id => apiFetch(`/api/character/${id}/achievements`),
   leaderboard: (scope, metric) => apiFetch(`/api/leaderboard?scope=${encodeURIComponent(scope)}&metric=${encodeURIComponent(metric)}`),
+  setCustomization: (id, avatarId, titleAchievementCode) => apiFetch(`/api/character/${id}/customization`, { method: 'PUT', body: JSON.stringify({ avatarId, titleAchievementCode }) }),
   daily:   id    => apiFetch(`/api/character/${id}/daily`),
   quests: (level, tag) => apiFetch('/api/quests?level=' + level + (tag ? '&tag=' + encodeURIComponent(tag) : '')),
   remove: id     => apiFetch('/api/character/' + id, { method: 'DELETE' }),
@@ -318,6 +323,11 @@ function render() { renderHud(); renderStats(); renderTagChips(); renderQuestBoa
 
 function renderHud() {
   const c = state.char; if (!c) return;
+  $('#charAvatar').textContent = AVATAR_EMOJI[c.avatarId] || '🐺';
+  const titleEl = $('#charTitle');
+  const titleName = c.titleAchievementCode ? titleNameFor(c.titleAchievementCode) : null;
+  titleEl.hidden = !titleName;
+  if (titleName) titleEl.textContent = `“${titleName}”`;
   $('#charName').textContent  = c.characterName;
   $('#charLevel').textContent = c.currentLevel;
   $('#charXp').textContent    = c.overallXp;
@@ -706,6 +716,7 @@ async function enterAppWithNewCharacter(name) {
   await loadQuests(created.currentLevel);
   await loadProgress();
   await loadDailyQuest();
+  await refreshAchievementCatalog();
   setConn(true); hideBanner();
   closeOverlay();
   $('#app').hidden = false;
@@ -722,6 +733,7 @@ async function enterAppAfterLogin() {
     await loadQuests(char.currentLevel);
     await loadProgress();
     await loadDailyQuest();
+    await refreshAchievementCatalog();
     setConn(true); hideBanner();
     closeOverlay();
     $('#app').hidden = false;
@@ -848,13 +860,22 @@ function saveApiBaseFromAccount() {
 }
 
 /* ========================== badges ========================================= */
+let achievementCatalog = []; // cached full catalog (locked + unlocked); also feeds the title picker
+function titleNameFor(code) {
+  const a = achievementCatalog.find(x => x.code === code);
+  return a ? a.name : code;
+}
+async function refreshAchievementCatalog() {
+  try { achievementCatalog = await API.achievements(state.char.id); } catch (_) { achievementCatalog = []; }
+}
+
 async function openBadges() {
   $('#badgesErr').textContent = '';
   $('#badgeGrid').innerHTML = '<div class="friend-empty">Loading…</div>';
   $('#badgesOverlay').classList.add('show');
   try {
-    const badges = await API.achievements(state.char.id);
-    renderBadgeGrid(badges);
+    await refreshAchievementCatalog();
+    renderBadgeGrid(achievementCatalog);
   } catch (e) {
     $('#badgeGrid').innerHTML = '';
     $('#badgesErr').textContent = e.message || 'Failed to load badges.';
@@ -891,6 +912,49 @@ function showAchievementToasts(achievements) {
       setTimeout(() => el.remove(), 5100);
     }, i * 300);
   });
+}
+
+/* ========================== customization =================================== */
+let customizeSelectedAvatar = null;
+
+async function openCustomize() {
+  $('#customizeErr').textContent = '';
+  customizeSelectedAvatar = state.char.avatarId;
+  renderAvatarGrid();
+  $('#customizeOverlay').classList.add('show');
+  await refreshAchievementCatalog();
+  const unlocked = achievementCatalog.filter(a => a.unlocked);
+  $('#titleSelect').innerHTML = '<option value="">— none —</option>'
+    + unlocked.map(a => `<option value="${esc(a.code)}">${esc(a.icon)} ${esc(a.name)}</option>`).join('');
+  $('#titleSelect').value = state.char.titleAchievementCode || '';
+}
+function closeCustomize() { $('#customizeOverlay').classList.remove('show'); }
+
+function renderAvatarGrid() {
+  const grid = $('#avatarGrid');
+  grid.innerHTML = Object.keys(AVATAR_EMOJI).map(id =>
+    `<div class="avatar-choice ${id === customizeSelectedAvatar ? 'selected' : ''}" data-avatar="${id}" title="${id}">${AVATAR_EMOJI[id]}</div>`
+  ).join('');
+  grid.querySelectorAll('.avatar-choice').forEach(el => {
+    el.addEventListener('click', () => { customizeSelectedAvatar = el.dataset.avatar; renderAvatarGrid(); });
+  });
+}
+
+async function saveCustomization() {
+  const btn = $('#customizeSaveBtn'); btn.disabled = true;
+  $('#customizeErr').textContent = '';
+  try {
+    const titleCode = $('#titleSelect').value || null;
+    const updated = await API.setCustomization(state.char.id, customizeSelectedAvatar, titleCode);
+    state.char = updated;
+    closeCustomize();
+    renderHud();
+    pushLog('system', 'SYSTEM: Appearance updated.');
+  } catch (e) {
+    $('#customizeErr').textContent = e.message || 'Failed to save customization.';
+  } finally {
+    btn.disabled = false;
+  }
 }
 
 /* ========================== leaderboard ===================================== */
@@ -1194,6 +1258,10 @@ async function boot() {
   $('#openBadgesBtn').addEventListener('click', openBadges);
   $('#badgesCloseBtn').addEventListener('click', closeBadges);
   $('#badgesOverlay').addEventListener('click', e => { if (e.target.id === 'badgesOverlay') closeBadges(); });
+  $('#openCustomizeBtn').addEventListener('click', openCustomize);
+  $('#customizeCloseBtn').addEventListener('click', closeCustomize);
+  $('#customizeOverlay').addEventListener('click', e => { if (e.target.id === 'customizeOverlay') closeCustomize(); });
+  $('#customizeSaveBtn').addEventListener('click', saveCustomization);
   $('#openLeaderboardBtn').addEventListener('click', openLeaderboard);
   $('#leaderboardCloseBtn').addEventListener('click', closeLeaderboard);
   $('#leaderboardOverlay').addEventListener('click', e => { if (e.target.id === 'leaderboardOverlay') closeLeaderboard(); });
@@ -1225,6 +1293,7 @@ async function boot() {
     await loadProgress();
     await loadDailyQuest();
     await refreshAdminFlag();
+    await refreshAchievementCatalog();
     setConn(true);
     $('#app').hidden = false;
     if (loadLog(id).length === 0)

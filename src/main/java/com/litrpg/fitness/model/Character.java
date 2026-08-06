@@ -55,6 +55,14 @@ public class Character {
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
+    /** Cosmetic only — no gameplay effect. Defaults to the first entry in the starter catalog. */
+    @Column(name = "avatar_id", nullable = false)
+    private String avatarId = "wolf";
+
+    /** Cosmetic only. Must be the code of one of this character's unlocked achievements, or null for none equipped. */
+    @Column(name = "title_achievement_code")
+    private String titleAchievementCode;
+
     /**
      * Eagerly loaded because virtually every read of a character also needs its
      * stat block, and there are at most four rows per character.
@@ -171,6 +179,22 @@ public class Character {
 
     public void setCreatedAt(LocalDateTime createdAt) {
         this.createdAt = createdAt;
+    }
+
+    public String getAvatarId() {
+        return avatarId;
+    }
+
+    public void setAvatarId(String avatarId) {
+        this.avatarId = avatarId;
+    }
+
+    public String getTitleAchievementCode() {
+        return titleAchievementCode;
+    }
+
+    public void setTitleAchievementCode(String titleAchievementCode) {
+        this.titleAchievementCode = titleAchievementCode;
     }
 
     public List<CharacterStat> getStats() {

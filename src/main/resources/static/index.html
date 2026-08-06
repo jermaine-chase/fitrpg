@@ -15,6 +15,7 @@
       <span class="conn"><span class="dot" id="connDot"></span><span id="connText">connecting…</span></span>
       <button class="friends-link" id="openBadgesBtn">🏅 Badges</button>
       <button class="friends-link" id="openLeaderboardBtn">🏆 Rankings</button>
+      <button class="friends-link" id="openCustomizeBtn">🎭 Customize</button>
       <button class="friends-link" id="openFriendsBtn">☍ Allies</button>
       <button class="friends-link" id="openAccountBtn">🔑 Account</button>
       <button class="friends-link" id="logoutBtn">⏻ Logout</button>
@@ -28,9 +29,10 @@
       <div class="hud__top">
         <div class="hud__id">
           <div class="eyebrow">Awakened Operative</div>
-          <h1 class="hud__name"><span id="charName">—</span>
+          <h1 class="hud__name"><span class="avatar-glyph" id="charAvatar">🐺</span><span id="charName">—</span>
             <span class="lv-badge" id="lvBadge">LV <span id="charLevel">1</span> <span class="heart">♥</span></span>
           </h1>
+          <div class="hud__title" id="charTitle" hidden></div>
         </div>
         <div class="streak">
           <div class="streak__day"><span class="flame">🔥</span>DAY <span id="streakDay">0</span></div>
@@ -197,6 +199,29 @@
 
       <div class="overlay__err" id="leaderboardErr"></div>
       <div class="friend-list" id="leaderboardBody"></div>
+    </div>
+  </div>
+
+  <!-- customization overlay -->
+  <div class="overlay" id="customizeOverlay">
+    <div class="panel overlay__card">
+      <button class="ov-close" id="customizeCloseBtn" aria-label="Close">✕</button>
+      <h2 class="panel-title"><span class="glyph">🎭</span> Customization</h2>
+      <p class="overlay__sub">Cosmetic only — no effect on gameplay.</p>
+      <div class="field">
+        <label>Avatar</label>
+        <div class="avatar-grid" id="avatarGrid"></div>
+      </div>
+      <div class="field">
+        <label for="titleSelect">Equipped Title</label>
+        <select id="titleSelect">
+          <option value="">— none —</option>
+        </select>
+      </div>
+      <div class="overlay__err" id="customizeErr"></div>
+      <div class="overlay__actions">
+        <button class="btn-primary" id="customizeSaveBtn">Save</button>
+      </div>
     </div>
   </div>
 
