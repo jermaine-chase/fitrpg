@@ -24,14 +24,15 @@ com.litrpg.fitness
 ├── model        User, Character, CharacterStat, WorkoutLog, Quest, QuestTag, StatType,
 │                DailyQuestAssignment, Friendship, FriendshipStatus, FriendVisibility,
 │                RevokedToken, Achievement, AchievementCriteriaType, CharacterAchievement,
-│                LeaderboardScope, LeaderboardMetric, QuestStatus
+│                LeaderboardScope, LeaderboardMetric, QuestStatus, GameEvent
 ├── repository   JpaRepository interfaces
 ├── service      AuthService, GameEngineService, CharacterService, DailyQuestService,
 │                FriendService, MidnightDecayService, GameFormulas, AchievementService,
-│                LeaderboardService, QuestService
+│                LeaderboardService, QuestService, GameEventService
 ├── dto          Auth/Character/Quest/Friend/DailyQuest request & response DTOs
 ├── controller   AuthController, CharacterController, QuestController,
-│                FriendController, AdminController, LeaderboardController
+│                FriendController, AdminController, LeaderboardController,
+│                AdminEventController, GameEventController
 └── exception    ResourceNotFoundException, GlobalExceptionHandler
 ```
 
@@ -154,6 +155,19 @@ visibility level also gates the **activity feed**
 (`GET /api/friends/feed`), which surfaces friends' recent quest claims —
 `NONE` friends are omitted entirely, `BASIC` shows only that a claim
 happened, `FULL` shows the quest, stat, and XP earned.
+
+## Timed events / seasonal XP multipliers
+
+`GameEvent` (name, `startAt`/`endAt`, `xpMultiplier`, optional `appliesToStat`)
+defines a time-boxed bonus — checked at claim time, the same "is this
+currently true?" pattern `MidnightDecayService` uses for inactivity, rather
+than a scheduler that flips characters in or out. Every currently-active
+event applicable to a quest's target stat (or unrestricted, if
+`appliesToStat` is null) stacks *multiplicatively* with the streak
+multiplier and the 15% bonus-challenge roll — none of them replace each
+other. Admin CRUD lives at `/api/admin/events`; the public, read-only
+`GET /api/events/active` (optionally `?stat=CON`) powers the quest board's
+event banner and the effective multiplier shown on each quest card.
 
 ## Player-authored quests
 

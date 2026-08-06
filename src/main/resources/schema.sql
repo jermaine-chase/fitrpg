@@ -276,6 +276,19 @@ CREATE TABLE IF NOT EXISTS revoked_tokens (
     expires_at TIMESTAMP   NOT NULL
 );
 
+-- Time-boxed seasonal XP multipliers, checked at claim time the same way
+-- MidnightDecayService checks inactivity — no scheduler flips these on/off.
+CREATE TABLE IF NOT EXISTS game_events (
+    id               UUID          PRIMARY KEY,
+    name             VARCHAR(255)  NOT NULL,
+    start_at         TIMESTAMP     NOT NULL,
+    end_at           TIMESTAMP     NOT NULL,
+    xp_multiplier    NUMERIC(5, 2) NOT NULL,
+    applies_to_stat  VARCHAR(3)
+);
+
+CREATE INDEX IF NOT EXISTS idx_game_events_window ON game_events (start_at, end_at);
+
 -- Helpful secondary indexes for FK lookups.
 CREATE INDEX IF NOT EXISTS idx_character_stats_character_id ON character_stats (character_id);
 CREATE INDEX IF NOT EXISTS idx_workout_logs_character_id    ON workout_logs (character_id);

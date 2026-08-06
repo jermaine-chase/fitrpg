@@ -123,6 +123,113 @@ async function loadQuests() {
   }
 }
 
+/* ========================== timed events ===================================== */
+let eventModalId = null;
+
+function fmtLocal(iso) {
+  if (!iso) return '—';
+  return iso.replace('T', ' ').slice(0, 16);
+}
+function toDatetimeLocalInput(iso) {
+  return iso ? iso.slice(0, 16) : '';
+}
+
+async function loadEvents() {
+  const tbody = $('#eventTbody');
+  try {
+    const events = await adminFetch('/api/admin/events');
+    if (events.length === 0) {
+      tbody.innerHTML = '<tr class="empty-row"><td colspan="6">No events configured.</td></tr>';
+      return;
+    }
+    const now = new Date();
+    tbody.innerHTML = events.map(e => {
+      const active = new Date(e.startAt) <= now && now <= new Date(e.endAt);
+      return `<tr data-eid="${esc(e.id)}" data-name="${esc(e.name)}" data-start="${esc(e.startAt)}" data-end="${esc(e.endAt)}" data-mult="${e.xpMultiplier}" data-stat="${esc(e.appliesToStat || '')}">
+        <td class="td-title">${esc(e.name)} ${active ? '<span class="badge badge-dex">LIVE</span>' : ''}</td>
+        <td style="color:var(--dim)">${fmtLocal(e.startAt)}</td>
+        <td style="color:var(--dim)">${fmtLocal(e.endAt)}</td>
+        <td class="td-num">${e.xpMultiplier}x</td>
+        <td>${e.appliesToStat ? `<span class="badge badge-${e.appliesToStat.toLowerCase()}">${esc(e.appliesToStat)}</span>` : '<span style="color:var(--faint)">All</span>'}</td>
+        <td class="td-acts">
+          <button class="btn btn-amber btn-sm e-edit" data-eid="${esc(e.id)}">Edit</button>
+          <button class="btn btn-danger btn-sm e-del" data-eid="${esc(e.id)}" data-name="${esc(e.name)}">Delete</button>
+        </td>
+      </tr>`;
+    }).join('');
+    tbody.querySelectorAll('.e-edit').forEach(btn => btn.addEventListener('click', () => openEventModal(btn.dataset.eid)));
+    tbody.querySelectorAll('.e-del').forEach(btn  => btn.addEventListener('click', () => deleteEvent(btn.dataset.eid, btn.dataset.name)));
+  } catch (e) {
+    tbody.innerHTML = `<tr class="empty-row"><td colspan="6">Error loading events: ${esc(e.message)}</td></tr>`;
+  }
+}
+
+function openEventModal(eventId) {
+  eventModalId = eventId || null;
+  $('#eventModalErr').textContent = '';
+  $('#eventModalTitle').innerHTML = `<span class="glyph">✨</span> ${eventId ? 'Edit Event' : 'Add Event'}`;
+  if (!eventId) {
+    $('#ef-name').value = '';
+    $('#ef-start').value = '';
+    $('#ef-end').value = '';
+    $('#ef-mult').value = '2.0';
+    $('#ef-stat').value = '';
+  } else {
+    const row = document.querySelector(`[data-eid="${CSS.escape(eventId)}"]`);
+    if (!row) return;
+    $('#ef-name').value  = row.dataset.name;
+    $('#ef-start').value = toDatetimeLocalInput(row.dataset.start);
+    $('#ef-end').value   = toDatetimeLocalInput(row.dataset.end);
+    $('#ef-mult').value  = row.dataset.mult;
+    $('#ef-stat').value  = row.dataset.stat;
+  }
+  $('#eventOverlay').classList.add('show');
+  $('#ef-name').focus();
+}
+function closeEventModal() { $('#eventOverlay').classList.remove('show'); }
+
+async function saveEvent() {
+  $('#eventModalErr').textContent = '';
+  const body = {
+    name: $('#ef-name').value.trim(),
+    startAt: $('#ef-start').value,
+    endAt: $('#ef-end').value,
+    xpMultiplier: parseFloat($('#ef-mult').value),
+    appliesToStat: $('#ef-stat').value || null,
+  };
+  if (!body.name) { $('#eventModalErr').textContent = 'Name is required.'; return; }
+  if (!body.startAt || !body.endAt) { $('#eventModalErr').textContent = 'Start and end are required.'; return; }
+  if (!body.xpMultiplier || body.xpMultiplier <= 0) { $('#eventModalErr').textContent = 'Multiplier must be positive.'; return; }
+
+  const btn = $('#eventModalSave'); btn.disabled = true;
+  try {
+    if (eventModalId) {
+      await adminFetch('/api/admin/events/' + eventModalId, { method: 'PUT', body: JSON.stringify(body) });
+      flash('Event updated.');
+    } else {
+      await adminFetch('/api/admin/events', { method: 'POST', body: JSON.stringify(body) });
+      flash('Event created.');
+    }
+    closeEventModal();
+    await loadEvents();
+  } catch (e) {
+    $('#eventModalErr').textContent = e.message;
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+async function deleteEvent(id, name) {
+  if (!confirm(`Delete event "${name}"?`)) return;
+  try {
+    await adminFetch('/api/admin/events/' + id, { method: 'DELETE' });
+    flash(`Event "${name}" deleted.`);
+    await loadEvents();
+  } catch (e) {
+    flash('Delete failed: ' + e.message, 'err');
+  }
+}
+
 /* ========================== pending quest submissions ======================= */
 async function loadPendingQuests() {
   const tbody = $('#pendingTbody');
@@ -363,6 +470,12 @@ async function boot() {
   $('#refreshCharsBtn').addEventListener('click', loadCharacters);
   $('#refreshPendingBtn').addEventListener('click', loadPendingQuests);
 
+  /* event modal wiring */
+  $('#addEventBtn').addEventListener('click', () => openEventModal(null));
+  $('#eventModalSave').addEventListener('click', saveEvent);
+  $('#eventModalCancel').addEventListener('click', closeEventModal);
+  $('#eventOverlay').addEventListener('keydown', e => { if (e.key === 'Escape') closeEventModal(); });
+
   const token = localStorage.getItem(LS.token);
   if (!token) {
     showAccessDenied("You're not signed in. Log in from the Operative Terminal first.");
@@ -374,7 +487,7 @@ async function boot() {
     // render an in-table message, so they won't surface a 401/403 here.
     await adminFetch('/api/admin/quests');
     showAdminPanel();
-    await Promise.all([loadQuests(), loadCharacters(), loadPendingQuests()]);
+    await Promise.all([loadQuests(), loadCharacters(), loadPendingQuests(), loadEvents()]);
   } catch (e) {
     if (e.status === 401 || e.status === 403) {
       // The filter treats an invalid/expired token the same as no token at

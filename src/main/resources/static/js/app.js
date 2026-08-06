@@ -144,6 +144,7 @@ const API = {
   leaderboard: (scope, metric) => apiFetch(`/api/leaderboard?scope=${encodeURIComponent(scope)}&metric=${encodeURIComponent(metric)}`),
   setCustomization: (id, avatarId, titleAchievementCode) => apiFetch(`/api/character/${id}/customization`, { method: 'PUT', body: JSON.stringify({ avatarId, titleAchievementCode }) }),
   submitQuest: body => apiFetch('/api/quests/submit', { method: 'POST', body: JSON.stringify(body) }),
+  activeEvents: () => apiFetch('/api/events/active'),
   daily:   id    => apiFetch(`/api/character/${id}/daily`),
   quests: (level, tag) => apiFetch('/api/quests?level=' + level + (tag ? '&tag=' + encodeURIComponent(tag) : '')),
   remove: id     => apiFetch('/api/character/' + id, { method: 'DELETE' }),
@@ -320,7 +321,7 @@ function markDone(charId, questId) {
 }
 
 /* ========================== rendering ===================================== */
-function render() { renderHud(); renderStats(); renderTagChips(); renderQuestBoard(); renderLog(); renderProgress(); }
+function render() { renderHud(); renderStats(); renderEventBanner(); renderTagChips(); renderQuestBoard(); renderLog(); renderProgress(); }
 
 function renderHud() {
   const c = state.char; if (!c) return;
@@ -425,8 +426,9 @@ function renderQuestBoard() {
     const isActive = q.questId === ui.activeQuestId;
     const isDaily  = q.questId === state.daily && !cleared;
     const dailyMult = isDaily ? state.dailyBonusMultiplier : 1;
-    const estStat  = Math.round(q.baseStatXp      * scale * mult * dailyMult);
-    const estChar  = Math.round(q.baseCharacterXp * scale * mult * dailyMult);
+    const eventMult = eventMultiplierFor(q.targetStat);
+    const estStat  = Math.round(q.baseStatXp      * scale * mult * dailyMult * eventMult);
+    const estChar  = Math.round(q.baseCharacterXp * scale * mult * dailyMult * eventMult);
 
     return `
       <div class="qcard ${isActive ? 'is-active' : ''} ${cleared ? 'is-cleared' : ''} ${isDaily ? 'is-daily' : ''}" data-qid="${esc(q.questId)}">
@@ -447,7 +449,7 @@ function renderQuestBoard() {
               <span class="obj__text">Complete the objective above</span>
             </label>`}
           <div class="rewards">
-            <div class="rewards__label">Rewards · ${mult.toFixed(2)}x streak · ${scale.toFixed(1)}x level${isDaily ? ` · ${dailyMult.toFixed(2)}x daily focus` : ''}</div>
+            <div class="rewards__label">Rewards · ${mult.toFixed(2)}x streak · ${scale.toFixed(1)}x level${eventMult !== 1 ? ` · ${eventMult.toFixed(2)}x event` : ''}${isDaily ? ` · ${dailyMult.toFixed(2)}x daily focus` : ''}</div>
             <div class="rewards__line">
               <span class="reward c-${lc}">~+${estStat} ${q.targetStat} XP</span>
               <span class="reward">~+${estChar} Character XP</span>
@@ -717,6 +719,7 @@ async function enterAppWithNewCharacter(name) {
   await loadQuests(created.currentLevel);
   await loadProgress();
   await loadDailyQuest();
+  await loadActiveEvents();
   await refreshAchievementCatalog();
   setConn(true); hideBanner();
   closeOverlay();
@@ -734,6 +737,7 @@ async function enterAppAfterLogin() {
     await loadQuests(char.currentLevel);
     await loadProgress();
     await loadDailyQuest();
+    await loadActiveEvents();
     await refreshAchievementCatalog();
     setConn(true); hideBanner();
     closeOverlay();
@@ -913,6 +917,30 @@ function showAchievementToasts(achievements) {
       setTimeout(() => el.remove(), 5100);
     }, i * 300);
   });
+}
+
+/* ========================== timed events ===================================== */
+let activeEvents = [];
+
+async function loadActiveEvents() {
+  try { activeEvents = await API.activeEvents(); } catch (_) { activeEvents = []; }
+}
+
+/** Combined multiplier from every currently-active event applicable to a stat (1 if none). */
+function eventMultiplierFor(statType) {
+  return activeEvents
+    .filter(e => !e.appliesToStat || e.appliesToStat === statType)
+    .reduce((m, e) => m * Number(e.xpMultiplier), 1);
+}
+
+function renderEventBanner() {
+  const el = $('#eventBanner');
+  if (activeEvents.length === 0) { el.hidden = true; return; }
+  el.hidden = false;
+  el.innerHTML = activeEvents.map(e => {
+    const scope = e.appliesToStat ? ` (${e.appliesToStat} only)` : '';
+    return `<span><span class="event-banner__glyph">✨</span> <b>${esc(e.name)}</b> — ${Number(e.xpMultiplier).toFixed(2)}x XP${scope}</span>`;
+  }).join(' &nbsp;·&nbsp; ');
 }
 
 /* ========================== quest submission ================================= */
@@ -1333,6 +1361,7 @@ async function boot() {
     await loadQuests(state.char.currentLevel);
     await loadProgress();
     await loadDailyQuest();
+    await loadActiveEvents();
     await refreshAdminFlag();
     await refreshAchievementCatalog();
     setConn(true);

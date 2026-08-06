@@ -87,17 +87,20 @@ public class GameEngineService {
     private final WorkoutLogRepository workoutLogRepository;
     private final DailyQuestService dailyQuestService;
     private final AchievementService achievementService;
+    private final GameEventService gameEventService;
 
     public GameEngineService(CharacterRepository characterRepository,
                              QuestRepository questRepository,
                              WorkoutLogRepository workoutLogRepository,
                              DailyQuestService dailyQuestService,
-                             AchievementService achievementService) {
+                             AchievementService achievementService,
+                             GameEventService gameEventService) {
         this.characterRepository = characterRepository;
         this.questRepository = questRepository;
         this.workoutLogRepository = workoutLogRepository;
         this.dailyQuestService = dailyQuestService;
         this.achievementService = achievementService;
+        this.gameEventService = gameEventService;
     }
 
     public int xpForNextLevel(int currentLevel) {
@@ -157,6 +160,14 @@ public class GameEngineService {
         int finalCharacterXp = (int) Math.round(scaledCharacterXp * streakMultiplier);
         int finalStatXp      = (int) Math.round(scaledStatXp      * streakMultiplier);
 
+        // 2b. Seasonal event multiplier(s), stacked on top of the streak bonus — checked "is one
+        // active right now?" at claim time, same pattern MidnightDecayService uses for inactivity.
+        double eventMultiplier = gameEventService.getActiveMultiplier(quest.getTargetStat());
+        if (eventMultiplier != 1.0) {
+            finalCharacterXp = (int) Math.round(finalCharacterXp * eventMultiplier);
+            finalStatXp      = (int) Math.round(finalStatXp      * eventMultiplier);
+        }
+
         // 3. Daily Focus bonus — extra reward for claiming today's assigned quest.
         int dailyFocusBonusXp = 0;
         if (dailyQuestService.isTodaysDailyQuest(characterId, questId)) {
@@ -199,7 +210,7 @@ public class GameEngineService {
         logEntry.setQuestTitle(quest.getTitle());
         logEntry.setStatType(targetStat);
         logEntry.setBaseXpEarned(scaledCharacterXp + scaledStatXp);
-        logEntry.setMultiplierApplied(BigDecimal.valueOf(streakMultiplier).setScale(2, RoundingMode.HALF_UP));
+        logEntry.setMultiplierApplied(BigDecimal.valueOf(streakMultiplier * eventMultiplier).setScale(2, RoundingMode.HALF_UP));
         logEntry.setFinalXpAwarded(finalCharacterXp + finalStatXp);
         logEntry.setLoggedAt(LocalDateTime.now());
         character.addWorkoutLog(logEntry);
