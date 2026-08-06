@@ -8,10 +8,16 @@ import org.springframework.stereotype.Repository;
 
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 @Repository
 public interface CharacterRepository extends JpaRepository<Character, UUID> {
+
+    Optional<Character> findByIdAndUserId(UUID id, UUID userId);
+
+    /** The first (in practice, only) character owned by a user — used for friend-detail lookups. */
+    Optional<Character> findFirstByUserId(UUID userId);
 
     /**
      * Characters who have a recorded last workout date strictly before

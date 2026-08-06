@@ -7,268 +7,16 @@
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Silkscreen:wght@400;700&family=Share+Tech+Mono&display=swap" rel="stylesheet" />
-<style>
-  :root {
-    --bg: #080b14;
-    --panel: #0e1525;
-    --panel-2: #0b1120;
-    --inset: #070b15;
-    --border: #1e2942;
-    --border-bright: #2c3c61;
-    --text: #c7d2e8;
-    --dim: #6b7a99;
-    --faint: #45526e;
-    --teal: #5eead4;
-    --cyan: #6fe7f5;
-    --amber: #f0a93b;
-    --str: #ff5757;
-    --dex: #4ade80;
-    --con: #f6a13c;
-    --wil: #b57cf6;
-    --danger: #ff5e5e;
-    --font-pixel: 'Silkscreen', 'Share Tech Mono', monospace;
-    --font-mono: 'Share Tech Mono', ui-monospace, monospace;
-    --radius: 10px;
-  }
-
-  * { box-sizing: border-box; }
-  html, body { margin: 0; }
-
-  body {
-    background-color: var(--bg);
-    background-image:
-      linear-gradient(rgba(120, 150, 220, 0.035) 1px, transparent 1px),
-      linear-gradient(90deg, rgba(120, 150, 220, 0.035) 1px, transparent 1px),
-      radial-gradient(1200px 600px at 50% -10%, rgba(60, 90, 160, 0.18), transparent 70%);
-    background-size: 32px 32px, 32px 32px, 100% 100%;
-    color: var(--text);
-    font-family: var(--font-mono);
-    font-size: 15px;
-    line-height: 1.5;
-    min-height: 100vh;
-    padding: 22px 16px 60px;
-    -webkit-font-smoothing: antialiased;
-  }
-
-  .app { max-width: 1180px; margin: 0 auto; display: flex; flex-direction: column; gap: 18px; }
-
-  .panel {
-    position: relative;
-    background: linear-gradient(180deg, var(--panel) 0%, var(--panel-2) 100%);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    padding: 20px 22px;
-    box-shadow: inset 0 1px 0 rgba(120, 150, 220, 0.06), 0 10px 30px -18px rgba(0, 0, 0, 0.9);
-  }
-
-  .eyebrow {
-    font-family: var(--font-mono);
-    font-size: 11px; letter-spacing: 3px; text-transform: uppercase;
-    color: var(--teal); opacity: 0.85;
-  }
-
-  .corner-tag {
-    position: absolute; top: 18px; right: 22px;
-    font-size: 11px; letter-spacing: 3px; text-transform: uppercase; color: var(--faint);
-  }
-
-  .panel-title {
-    font-family: var(--font-pixel);
-    font-size: 16px; font-weight: 700;
-    letter-spacing: 1px; text-transform: uppercase; color: var(--text);
-    margin: 0 0 16px; display: flex; align-items: center; gap: 9px;
-  }
-  .panel-title .glyph { color: var(--teal); }
-
-  /* ---- HUD ---------------------------------------------------------------- */
-  .hud__top { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; }
-  .hud__name {
-    font-family: var(--font-pixel); font-weight: 700; font-size: 30px;
-    color: #fff; margin: 4px 0 0; letter-spacing: 1px;
-    text-shadow: 0 0 18px rgba(110, 231, 245, 0.25);
-    display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap;
-  }
-  .lv-badge {
-    font-family: var(--font-pixel); font-size: 12px; color: var(--amber);
-    border: 1px solid rgba(240, 169, 59, 0.4); border-radius: 5px;
-    padding: 3px 7px; letter-spacing: 1px; background: rgba(240, 169, 59, 0.07);
-  }
-  .lv-badge .heart { color: var(--str); }
-
-  .streak {
-    border: 1px solid rgba(240, 169, 59, 0.45); border-radius: 8px;
-    padding: 10px 16px; text-align: right; min-width: 150px;
-    background: linear-gradient(180deg, rgba(240, 169, 59, 0.08), rgba(240, 169, 59, 0.02));
-  }
-  .streak__day { font-family: var(--font-pixel); font-size: 18px; color: var(--amber); letter-spacing: 1px; }
-  .streak__day .flame { margin-right: 6px; }
-  .streak__buff { font-size: 11px; letter-spacing: 2px; color: var(--dim); margin-top: 4px; text-transform: uppercase; }
-
-  .hud__xp { margin-top: 20px; }
-  .xp-row { display: flex; justify-content: space-between; align-items: baseline; font-size: 11px; letter-spacing: 2px; text-transform: uppercase; color: var(--dim); }
-  .xp-row .xp-val { color: var(--text); letter-spacing: 1px; }
-
-  .bar { position: relative; height: 4px; margin-top: 9px; border-radius: 99px; background: var(--inset); border: 1px solid var(--border); overflow: hidden; }
-  .bar__fill { position: absolute; inset: 0 auto 0 0; height: 100%; width: 0%; border-radius: 99px;
-    background: linear-gradient(90deg, var(--teal), var(--cyan)); box-shadow: 0 0 10px rgba(110, 231, 245, 0.6);
-    transition: width 0.5s ease; }
-
-  /* ---- main grid ---------------------------------------------------------- */
-  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; align-items: start; }
-
-  /* ---- attributes --------------------------------------------------------- */
-  .stat { border: 1px solid var(--border); border-radius: 8px; padding: 13px 15px 11px; margin-bottom: 12px; background: rgba(10, 16, 30, 0.4); }
-  .stat__head { display: flex; align-items: center; gap: 10px; }
-  .stat__tag { font-family: var(--font-pixel); font-size: 12px; font-weight: 700; letter-spacing: 1px; min-width: 34px; }
-  .stat__name { font-size: 15px; color: var(--text); flex: 1; }
-  .stat__lv { font-size: 12px; letter-spacing: 1px; color: var(--dim); text-transform: uppercase; }
-  .stat__status {
-    font-family: var(--font-pixel); font-size: 9px; letter-spacing: 1px; padding: 4px 7px; border-radius: 5px;
-    text-transform: uppercase;
-  }
-  .stat__status.is-active { color: var(--teal); border: 1px solid rgba(94, 234, 212, 0.4); background: rgba(94, 234, 212, 0.06); }
-  .stat__status.is-rusty  { color: var(--danger); border: 1px solid rgba(255, 94, 94, 0.4); background: rgba(255, 94, 94, 0.07); }
-  .stat__bar { margin-top: 14px; }
-  .stat__xp { text-align: right; font-size: 11px; letter-spacing: 1px; color: var(--dim); margin-top: 7px; }
-
-  .c-str { color: var(--str); } .c-dex { color: var(--dex); } .c-con { color: var(--con); } .c-wil { color: var(--wil); }
-  .fill-str { background: linear-gradient(90deg, #b3201f, var(--str)); box-shadow: 0 0 8px rgba(255,87,87,.5); }
-  .fill-dex { background: linear-gradient(90deg, #1f9e4f, var(--dex)); box-shadow: 0 0 8px rgba(74,222,128,.5); }
-  .fill-con { background: linear-gradient(90deg, #b96b16, var(--con)); box-shadow: 0 0 8px rgba(246,161,60,.5); }
-  .fill-wil { background: linear-gradient(90deg, #6f3dad, var(--wil)); box-shadow: 0 0 8px rgba(181,124,246,.5); }
-
-  .abandon {
-    width: 100%; margin-top: 4px; padding: 11px; background: rgba(10,16,30,0.5);
-    border: 1px solid var(--border); border-radius: 8px; color: var(--dim);
-    font-family: var(--font-mono); font-size: 12px; letter-spacing: 1px; cursor: pointer;
-    transition: all 0.15s ease;
-  }
-  .abandon:hover { color: var(--danger); border-color: rgba(255, 94, 94, 0.45); }
-
-  /* ---- quest board -------------------------------------------------------- */
-  .quest-list { display: flex; flex-direction: column; gap: 8px; max-height: 520px; overflow-y: auto; padding-right: 4px; }
-  .quest-list::-webkit-scrollbar { width: 6px; }
-  .quest-list::-webkit-scrollbar-thumb { background: var(--border-bright); border-radius: 99px; }
-
-  .qcard {
-    border: 1px solid var(--border); border-radius: 8px;
-    background: rgba(8, 12, 22, 0.5); overflow: hidden;
-    transition: border-color 0.15s ease;
-  }
-  .qcard.is-active { border-color: var(--border-bright); }
-  .qcard.is-cleared { opacity: 0.6; }
-
-  .qcard__header {
-    display: flex; align-items: center; gap: 10px;
-    padding: 12px 14px; cursor: pointer; user-select: none;
-  }
-  .qcard__rank { font-family: var(--font-pixel); font-size: 11px; font-weight: 700; letter-spacing: 1px; min-width: 28px; }
-  .qcard__title { flex: 1; font-size: 14px; color: var(--text); }
-  .qcard__meta { font-size: 11px; letter-spacing: 1px; color: var(--dim); white-space: nowrap; }
-  .qcard__chevron { color: var(--faint); font-size: 12px; transition: transform 0.15s ease; }
-  .qcard.is-active .qcard__chevron { transform: rotate(180deg); }
-
-  .qcard__body { padding: 0 14px 14px; display: none; }
-  .qcard.is-active .qcard__body { display: block; }
-
-  .qcard__desc { font-style: italic; color: var(--dim); font-size: 13px; margin: 0 0 14px; line-height: 1.55; }
-
-  .obj { display: flex; align-items: center; gap: 12px; cursor: pointer; user-select: none; margin-bottom: 14px; }
-  .obj input { position: absolute; opacity: 0; width: 0; height: 0; }
-  .obj__box { width: 22px; height: 22px; border: 1px solid var(--border-bright); border-radius: 5px; background: var(--inset); flex-shrink: 0; display: grid; place-items: center; transition: all 0.15s ease; }
-  .obj__box::after { content: '✓'; color: var(--teal); font-size: 14px; opacity: 0; transform: scale(0.5); transition: all 0.15s ease; }
-  .obj input:checked + .obj__box { border-color: var(--teal); background: rgba(94, 234, 212, 0.1); }
-  .obj input:checked + .obj__box::after { opacity: 1; transform: scale(1); }
-  .obj__text { font-size: 14px; }
-
-  .rewards { background: var(--inset); border: 1px solid var(--border); border-radius: 7px; padding: 10px 12px; margin-bottom: 12px; }
-  .rewards__label { font-family: var(--font-pixel); font-size: 10px; letter-spacing: 1px; color: var(--dim); text-transform: uppercase; margin-bottom: 5px; }
-  .rewards__line { font-size: 13px; display: flex; gap: 4px; flex-wrap: wrap; }
-  .reward { white-space: nowrap; }
-  .reward + .reward::before { content: ' · '; color: var(--faint); }
-
-  .complete {
-    width: 100%; padding: 12px; border-radius: 8px; cursor: pointer;
-    font-family: var(--font-pixel); font-size: 11px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase;
-    background: linear-gradient(180deg, rgba(94,234,212,0.16), rgba(94,234,212,0.05));
-    border: 1px solid rgba(94, 234, 212, 0.45); color: var(--teal);
-    transition: all 0.15s ease;
-  }
-  .complete:hover:not(:disabled) { background: rgba(94, 234, 212, 0.22); box-shadow: 0 0 18px -4px rgba(94,234,212,0.5); }
-  .complete:disabled { background: rgba(10,16,30,0.6); border-color: var(--border); color: var(--faint); cursor: not-allowed; }
-
-  .quest-empty { color: var(--dim); font-size: 13px; padding: 20px 0; text-align: center; letter-spacing: 1px; }
-
-  /* ---- combat log --------------------------------------------------------- */
-  .log__body { font-size: 14px; max-height: 220px; overflow-y: auto; display: flex; flex-direction: column; gap: 6px; padding-right: 6px; }
-  .line { display: flex; gap: 9px; align-items: baseline; }
-  .line__glyph { color: var(--dim); flex-shrink: 0; }
-  .line.cat-system .line__glyph { color: var(--cyan); }
-  .line.cat-quest  .line__glyph { color: var(--dex); }
-  .line.cat-level  .line__glyph { color: var(--amber); }
-  .line.cat-decay  .line__glyph { color: var(--danger); }
-  .line.cat-bonus  .line__glyph { color: var(--wil); }
-  .line.cat-error  .line__glyph { color: var(--danger); }
-  .line.cat-error  .line__text  { color: #ffb4b4; }
-  .hl { color: #fff; }
-  .log__body::-webkit-scrollbar { width: 8px; }
-  .log__body::-webkit-scrollbar-thumb { background: var(--border-bright); border-radius: 99px; }
-
-  /* ---- topbar ------------------------------------------------------------- */
-  .topbar { display: flex; justify-content: flex-end; align-items: center; gap: 12px; margin: -6px 2px -2px; }
-  .conn { display: flex; align-items: center; gap: 7px; font-size: 11px; letter-spacing: 2px; text-transform: uppercase; color: var(--dim); }
-  .dot { width: 8px; height: 8px; border-radius: 99px; background: var(--faint); box-shadow: 0 0 8px currentColor; }
-  .dot.ok { background: var(--dex); color: var(--dex); }
-  .dot.bad { background: var(--danger); color: var(--danger); }
-  .gear { background: none; border: 1px solid var(--border); color: var(--dim); border-radius: 7px; cursor: pointer; padding: 5px 9px; font-size: 14px; }
-  .gear:hover { color: var(--teal); border-color: var(--border-bright); }
-  .admin-link { font-size: 11px; letter-spacing: 2px; text-transform: uppercase; color: var(--faint); text-decoration: none; border: 1px solid var(--border); border-radius: 7px; padding: 5px 10px; transition: all 0.15s ease; }
-  .admin-link:hover { color: var(--amber); border-color: rgba(240,169,59,0.4); }
-
-  /* ---- banner + overlay --------------------------------------------------- */
-  .banner { display: none; background: rgba(255, 94, 94, 0.1); border: 1px solid rgba(255, 94, 94, 0.4); border-radius: 8px; padding: 12px 16px; color: #ffb4b4; font-size: 14px; }
-  .banner.show { display: block; }
-  .banner b { color: #fff; }
-
-  .overlay { position: fixed; inset: 0; background: rgba(4, 6, 12, 0.86); display: none; place-items: center; padding: 20px; z-index: 50; backdrop-filter: blur(3px); }
-  .overlay.show { display: grid; }
-  .overlay__card { width: 100%; max-width: 440px; }
-  .overlay__card .panel-title { margin-bottom: 6px; }
-  .overlay__sub { color: var(--dim); font-size: 13px; margin-bottom: 20px; line-height: 1.55; }
-  .field { margin-bottom: 16px; }
-  .field label { display: block; font-size: 11px; letter-spacing: 2px; text-transform: uppercase; color: var(--dim); margin-bottom: 7px; }
-  .field input { width: 100%; padding: 11px 13px; background: var(--inset); border: 1px solid var(--border-bright); border-radius: 7px; color: var(--text); font-family: var(--font-mono); font-size: 15px; }
-  .field input:focus { outline: 2px solid rgba(94,234,212,0.5); outline-offset: 1px; }
-  .overlay__err { color: var(--danger); font-size: 13px; min-height: 18px; margin-bottom: 12px; }
-  .overlay__actions { display: flex; gap: 10px; }
-  .btn-primary, .btn-ghost {
-    flex: 1; padding: 13px; border-radius: 8px; cursor: pointer;
-    font-family: var(--font-pixel); font-size: 11px; font-weight: 700; letter-spacing: 1px; text-transform: uppercase;
-    transition: all 0.15s ease;
-  }
-  .btn-primary { background: linear-gradient(180deg, rgba(94,234,212,0.18), rgba(94,234,212,0.06)); border: 1px solid rgba(94,234,212,0.5); color: var(--teal); }
-  .btn-primary:hover { background: rgba(94, 234, 212, 0.26); }
-  .btn-primary:disabled { opacity: 0.5; cursor: wait; }
-  .btn-ghost { background: none; border: 1px solid var(--border); color: var(--dim); }
-  .btn-ghost:hover { color: var(--text); border-color: var(--border-bright); }
-
-  *:focus-visible { outline: 2px solid var(--cyan); outline-offset: 2px; }
-
-  @media (max-width: 880px) {
-    .grid { grid-template-columns: 1fr; }
-    .hud__top { flex-direction: column; }
-    .streak { text-align: left; width: 100%; }
-    .hud__name { font-size: 24px; }
-  }
-  @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
-</style>
+<link rel="stylesheet" href="css/app.css" />
 </head>
 <body>
   <div class="app" id="app" hidden>
     <div class="topbar">
       <span class="conn"><span class="dot" id="connDot"></span><span id="connText">connecting…</span></span>
-      <a class="admin-link" href="admin.html">⚙ Admin</a>
-      <button class="gear" id="gearBtn" title="API settings" aria-label="API settings">⚙</button>
+      <button class="friends-link" id="openFriendsBtn">☍ Allies</button>
+      <button class="friends-link" id="openAccountBtn">🔑 Account</button>
+      <button class="friends-link" id="logoutBtn">⏻ Logout</button>
+      <a class="admin-link" id="adminLink" href="admin.html" hidden>⚙ Admin</a>
     </div>
 
     <div class="banner" id="banner"></div>
@@ -285,6 +33,7 @@
         <div class="streak">
           <div class="streak__day"><span class="flame">🔥</span>DAY <span id="streakDay">0</span></div>
           <div class="streak__buff"><span id="buffVal">1.00</span>x XP Buff</div>
+          <div class="streak__risk" id="streakRisk" hidden></div>
         </div>
       </div>
       <div class="hud__xp">
@@ -309,6 +58,24 @@
       </section>
     </div>
 
+    <!-- progress dashboard -->
+    <section class="panel" aria-label="Progress dashboard">
+      <span class="corner-tag">History</span>
+      <h2 class="panel-title"><span class="glyph">📈</span> Progress</h2>
+      <div class="progress-grid">
+        <div class="progress-block">
+          <div class="progress-block__label">XP earned — last 14 days</div>
+          <div class="xp-chart" id="xpChart"></div>
+        </div>
+        <div class="progress-block">
+          <div class="progress-block__label">All-time XP by attribute</div>
+          <div class="stat-dist-bar" id="statDistBar"></div>
+          <div class="stat-dist-legend" id="statDistLegend"></div>
+        </div>
+      </div>
+      <div class="chart-empty" id="progressEmpty" hidden>No quests claimed yet — your history will appear here.</div>
+    </section>
+
     <!-- combat log -->
     <section class="panel" aria-label="Combat log">
       <span class="corner-tag">/var/log/system</span>
@@ -321,10 +88,30 @@
   <div class="overlay" id="overlay">
     <div class="panel overlay__card">
       <h2 class="panel-title"><span class="glyph">✦</span> <span id="ovTitle">Bind Your Soul</span></h2>
-      <p class="overlay__sub" id="ovSub">Enter the API endpoint and forge a new operative. The Iron Path remembers nothing of the idle.</p>
-      <div class="field">
-        <label for="ovApi">API Endpoint</label>
-        <input id="ovApi" type="text" spellcheck="false" placeholder="http://localhost:8080" />
+      <p class="overlay__sub" id="ovSub">Register an account and forge a new operative. The Iron Path remembers nothing of the idle.</p>
+      <div class="field" id="ovUsernameField">
+        <label for="ovUsername">Username</label>
+        <input id="ovUsername" type="text" autocomplete="username" maxlength="50" placeholder="e.g. jason" />
+      </div>
+      <div class="field" id="ovPasswordField">
+        <label for="ovPassword">Password</label>
+        <input id="ovPassword" type="password" autocomplete="new-password" maxlength="255" placeholder="min. 8 characters" />
+      </div>
+      <div class="field" id="ovQuestionField">
+        <label for="ovQuestion">Security Question <span style="text-transform:none;letter-spacing:0;">(for password recovery)</span></label>
+        <input id="ovQuestion" type="text" maxlength="255" placeholder="e.g. Name of your first pet?" />
+      </div>
+      <div class="field" id="ovAnswerField">
+        <label for="ovAnswer" id="ovAnswerLabel">Security Answer</label>
+        <input id="ovAnswer" type="text" maxlength="255" autocomplete="off" />
+      </div>
+      <div class="field" id="ovForgotQuestionField" hidden>
+        <label>Security Question</label>
+        <p id="ovForgotQuestionText" style="color:var(--text); font-size:14px; margin:0;"></p>
+      </div>
+      <div class="field" id="ovNewPasswordField" hidden>
+        <label for="ovNewPassword">New Password</label>
+        <input id="ovNewPassword" type="password" autocomplete="new-password" maxlength="255" placeholder="min. 8 characters" />
       </div>
       <div class="field" id="ovNameField">
         <label for="ovName">Operative Name</label>
@@ -332,408 +119,95 @@
       </div>
       <div class="overlay__err" id="ovErr"></div>
       <div class="overlay__actions">
-        <button class="btn-ghost" id="ovCancel" hidden>Cancel</button>
         <button class="btn-primary" id="ovSubmit">Bind Soul</button>
+      </div>
+      <p class="overlay__toggle" id="ovForgotLinkWrap" hidden>
+        <a href="#" id="ovForgotLink">Forgot password?</a>
+      </p>
+      <p class="overlay__toggle" id="ovToggleWrap">
+        <a href="#" id="ovToggleMode">Already bound? Log in instead.</a>
+      </p>
+    </div>
+  </div>
+
+  <!-- account security overlay -->
+  <div class="overlay" id="accountOverlay">
+    <div class="panel overlay__card">
+      <button class="ov-close" id="accountCloseBtn" aria-label="Close">✕</button>
+      <h2 class="panel-title"><span class="glyph">🔑</span> Account Security</h2>
+      <p class="overlay__sub" id="acctSub">Set or update your password-recovery question.</p>
+      <div class="field">
+        <label for="acctCurrentPassword">Current Password</label>
+        <input id="acctCurrentPassword" type="password" autocomplete="current-password" maxlength="255" />
+      </div>
+      <div class="field">
+        <label for="acctQuestion">Security Question</label>
+        <input id="acctQuestion" type="text" maxlength="255" placeholder="e.g. Name of your first pet?" />
+      </div>
+      <div class="field">
+        <label for="acctAnswer">Security Answer</label>
+        <input id="acctAnswer" type="text" maxlength="255" autocomplete="off" />
+      </div>
+      <div class="overlay__err" id="acctErr"></div>
+      <div class="overlay__actions">
+        <button class="btn-primary" id="acctSubmit">Save</button>
       </div>
     </div>
   </div>
 
-<script>
-"use strict";
+  <!-- friends overlay -->
+  <div class="overlay" id="friendsOverlay">
+    <div class="panel overlay__card friends-card">
+      <button class="ov-close" id="friendsCloseBtn" aria-label="Close">✕</button>
+      <h2 class="panel-title"><span class="glyph">☍</span> Allies Registry</h2>
 
-/* ========================== configuration ================================= */
-const LS = {
-  api:    'ironpath_api',
-  charId: 'ironpath_char_id',
-  log:    id => `ironpath_log_${id}`,
-  done:   id => `ironpath_done_${id}`,
-};
-const DEFAULT_API = 'http://localhost:8080';
-const STAT_ORDER  = ['STR', 'DEX', 'CON', 'WIL'];
-const STAT_NAME   = { STR: 'Strength', DEX: 'Dexterity', CON: 'Constitution', WIL: 'Willpower' };
+      <div class="friends-tabs" id="friendsTabs">
+        <button class="ftab active" data-tab="list">Friends</button>
+        <button class="ftab" data-tab="feed">Guild Hall</button>
+        <button class="ftab" data-tab="requests">Requests</button>
+        <button class="ftab" data-tab="settings">Privacy</button>
+      </div>
 
-const RANK_LABEL = minLevel => {
-  if (minLevel >= 50) return 'B';
-  if (minLevel >= 25) return 'C';
-  if (minLevel >= 10) return 'D';
-  return 'E';
-};
+      <div class="overlay__err" id="friendsErr"></div>
 
-/* Mirrors GameFormulas.questXpScale for reward preview. */
-const questXpScale    = level => Math.pow(Math.max(1, level), 0.75);
-const multiplierFor   = streak => 1 + Math.min(streak * 0.05, 0.50);
-const pct             = (xp, max) => Math.max(0, Math.min(100, max > 0 ? (xp / max) * 100 : 0));
-const $               = sel => document.querySelector(sel);
-const esc             = s => String(s).replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
-const apiBase         = () => (localStorage.getItem(LS.api) || DEFAULT_API).replace(/\/+$/, '');
-const todayStr        = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; };
+      <div class="ftab-panel" id="ftabFeed" hidden>
+        <div class="friend-list" id="friendFeedBody"></div>
+      </div>
 
-/* ========================== state ========================================= */
-let state = { char: null };
-let ui    = { activeQuestId: null, checked: false, busy: false };
-let quests = [];
-
-/* ========================== API layer ===================================== */
-async function apiFetch(path, options = {}) {
-  const res = await fetch(apiBase() + path, {
-    headers: { 'Content-Type': 'application/json' },
-    ...options,
-  });
-  if (!res.ok) {
-    let msg = `HTTP ${res.status}`;
-    try { const b = await res.json(); if (b && b.message) msg = b.message; } catch (_) {}
-    const err = new Error(msg); err.status = res.status; throw err;
-  }
-  return res.status === 204 ? null : res.json();
-}
-
-const API = {
-  create: name   => apiFetch('/api/character', { method: 'POST', body: JSON.stringify({ characterName: name }) }),
-  get:    id     => apiFetch('/api/character/' + id),
-  claim:  (id, questId) => apiFetch(`/api/character/${id}/claim`, { method: 'POST', body: JSON.stringify({ questId }) }),
-  quests: level  => apiFetch('/api/quests?level=' + level),
-  remove: id     => apiFetch('/api/character/' + id, { method: 'DELETE' }),
-};
-
-/* ========================== quest loading ================================= */
-async function loadQuests(level) {
-  try {
-    quests = await API.quests(level);
-    if (ui.activeQuestId && !quests.find(q => q.questId === ui.activeQuestId)) {
-      ui.activeQuestId = null;
-    }
-  } catch (_) {
-    quests = [];
-  }
-}
-
-/* ========================== combat log ==================================== */
-function loadLog(id)          { try { return JSON.parse(localStorage.getItem(LS.log(id))) || []; } catch (_) { return []; } }
-function saveLog(id, lines)   { localStorage.setItem(LS.log(id), JSON.stringify(lines.slice(-80))); }
-function pushLog(cat, html) {
-  if (!state.char) return;
-  const lines = loadLog(state.char.id);
-  lines.push({ category: cat, html });
-  saveLog(state.char.id, lines);
-  renderLog();
-}
-const GLYPH = { system: '▣', quest: '✦', level: '↑', decay: '☠', bonus: '★', error: '!' };
-
-/* ========================== done-today tracking =========================== */
-function loadDone(id) {
-  try { const d = JSON.parse(localStorage.getItem(LS.done(id))); if (d && d.date === todayStr()) return new Set(d.ids); } catch (_) {}
-  return new Set();
-}
-function markDone(charId, questId) {
-  const set = loadDone(charId); set.add(questId);
-  localStorage.setItem(LS.done(charId), JSON.stringify({ date: todayStr(), ids: [...set] }));
-}
-
-/* ========================== rendering ===================================== */
-function render() { renderHud(); renderStats(); renderQuestBoard(); renderLog(); }
-
-function renderHud() {
-  const c = state.char; if (!c) return;
-  $('#charName').textContent  = c.characterName;
-  $('#charLevel').textContent = c.currentLevel;
-  $('#charXp').textContent    = c.overallXp;
-  $('#charXpMax').textContent = c.xpForNextLevel;
-  $('#charXpFill').style.width = pct(c.overallXp, c.xpForNextLevel) + '%';
-  $('#streakDay').textContent = c.streakCount;
-  $('#buffVal').textContent   = multiplierFor(c.streakCount).toFixed(2);
-}
-
-function renderStats() {
-  const c = state.char; if (!c) return;
-  const byType = Object.fromEntries(c.stats.map(s => [s.statType, s]));
-  $('#statList').innerHTML = STAT_ORDER.map(type => {
-    const s = byType[type]; if (!s) return '';
-    const rusty = (s.status || '').toLowerCase() === 'rusty';
-    const lc = type.toLowerCase();
-    return `
-      <div class="stat">
-        <div class="stat__head">
-          <span class="stat__tag c-${lc}">${type}</span>
-          <span class="stat__name">${esc(STAT_NAME[type] || type)}</span>
-          <span class="stat__lv">LV ${s.currentLevel}</span>
-          <span class="stat__status ${rusty ? 'is-rusty' : 'is-active'}">${rusty ? 'Rusty' : 'Active'}</span>
+      <div class="ftab-panel" id="ftabList">
+        <div class="add-friend-row">
+          <input id="addFriendInput" placeholder="username" maxlength="50" autocomplete="off" />
+          <button class="btn-primary" id="addFriendBtn">Send Request</button>
         </div>
-        <div class="bar stat__bar"><div class="bar__fill fill-${lc}" style="width:${pct(s.currentXp, s.xpForNextLevel)}%"></div></div>
-        <div class="stat__xp">${s.currentXp} / ${s.xpForNextLevel} XP</div>
-      </div>`;
-  }).join('');
-}
+        <div class="friend-list" id="friendsListBody"></div>
+      </div>
 
-function renderQuestBoard() {
-  const c = state.char;
-  if (!c || quests.length === 0) {
-    $('#questList').innerHTML = '<p class="quest-empty">No quests available — check API connection.</p>';
-    return;
-  }
+      <div class="ftab-panel" id="ftabRequests" hidden>
+        <div class="friend-sublabel">Received</div>
+        <div class="friend-list" id="incomingListBody"></div>
+        <div class="friend-sublabel">Sent</div>
+        <div class="friend-list" id="outgoingListBody"></div>
+      </div>
 
-  const done      = loadDone(c.id);
-  const scale     = questXpScale(c.currentLevel);
-  const mult      = multiplierFor(c.streakCount);
-
-  $('#questList').innerHTML = quests.map(q => {
-    const lc       = q.targetStat.toLowerCase();
-    const rank     = RANK_LABEL(q.minLevel);
-    const cleared  = done.has(q.questId);
-    const isActive = q.questId === ui.activeQuestId;
-    const estStat  = Math.round(q.baseStatXp      * scale * mult);
-    const estChar  = Math.round(q.baseCharacterXp * scale * mult);
-
-    return `
-      <div class="qcard ${isActive ? 'is-active' : ''} ${cleared ? 'is-cleared' : ''}" data-qid="${esc(q.questId)}">
-        <div class="qcard__header">
-          <span class="qcard__rank c-${lc}">${rank}·${q.targetStat}</span>
-          <span class="qcard__title">${esc(q.title)}</span>
-          <span class="qcard__meta">~${estStat+estChar} XP</span>
-          <span class="qcard__chevron">▾</span>
+      <div class="ftab-panel" id="ftabSettings" hidden>
+        <p class="overlay__sub">Applies to any friend you haven't set a specific level for.</p>
+        <div class="field">
+          <label for="defaultVisibilitySelect">Default detail shown to friends</label>
+          <select id="defaultVisibilitySelect">
+            <option value="NONE">Hidden — no character details</option>
+            <option value="BASIC">Basic — name &amp; level only</option>
+            <option value="FULL">Full — entire character sheet</option>
+          </select>
         </div>
-        <div class="qcard__body">
-          ${q.description ? `<p class="qcard__desc">${esc(q.description)}</p>` : ''}
-          ${cleared ? '' : `
-            <label class="obj">
-              <input type="checkbox" class="qc-check" data-qid="${esc(q.questId)}" ${isActive && ui.checked ? 'checked' : ''}>
-              <span class="obj__box"></span>
-              <span class="obj__text">Complete the objective above</span>
-            </label>`}
-          <div class="rewards">
-            <div class="rewards__label">Rewards · ${mult.toFixed(2)}x streak · ${scale.toFixed(1)}x level</div>
-            <div class="rewards__line">
-              <span class="reward c-${lc}">~+${estStat} ${q.targetStat} XP</span>
-              <span class="reward">~+${estChar} Character XP</span>
-            </div>
-          </div>
-          <button class="complete" data-qid="${esc(q.questId)}"
-            ${cleared ? 'disabled' : ((!isActive || !ui.checked || ui.busy) ? 'disabled' : '')}>
-            ${cleared ? 'Quest Cleared ✓' : (ui.busy && isActive ? 'Submitting…' : 'Complete Objective')}
-          </button>
-        </div>
-      </div>`;
-  }).join('');
+      </div>
 
-  /* wire events */
-  $('#questList').querySelectorAll('.qcard__header').forEach(hdr => {
-    hdr.addEventListener('click', () => {
-      const qid = hdr.closest('.qcard').dataset.qid;
-      if (ui.activeQuestId === qid) {
-        ui.activeQuestId = null;
-      } else {
-        ui.activeQuestId = qid;
-        ui.checked = false;
-      }
-      renderQuestBoard();
-    });
-  });
-  $('#questList').querySelectorAll('.qc-check').forEach(chk => {
-    chk.addEventListener('change', () => {
-      ui.checked = chk.checked;
-      renderQuestBoard();
-    });
-  });
-  $('#questList').querySelectorAll('.complete').forEach(btn => {
-    if (!btn.disabled) btn.addEventListener('click', () => claimQuest(btn.dataset.qid));
-  });
-}
+      <div class="ftab-panel" id="ftabDetail" hidden>
+        <button class="btn-ghost" id="friendDetailBack" style="margin-bottom:16px;">← Back to Friends</button>
+        <div id="friendDetailBody"></div>
+      </div>
+    </div>
+  </div>
 
-function renderLog() {
-  if (!state.char) return;
-  const body = $('#logBody');
-  body.innerHTML = loadLog(state.char.id).map(l =>
-    `<div class="line cat-${l.category}"><span class="line__glyph">${GLYPH[l.category] || '·'}</span><span class="line__text">${l.html}</span></div>`
-  ).join('');
-  body.scrollTop = body.scrollHeight;
-}
-
-/* ========================== connection chip =============================== */
-function setConn(ok) {
-  const dot = $('#connDot'), txt = $('#connText');
-  dot.className = 'dot ' + (ok ? 'ok' : 'bad');
-  txt.textContent = ok ? 'linked · ' + apiBase().replace(/^https?:\/\//, '') : 'offline';
-}
-function showBanner(msg) { const b = $('#banner'); b.innerHTML = msg; b.classList.add('show'); }
-function hideBanner()    { $('#banner').classList.remove('show'); }
-
-/* ========================== actions ======================================= */
-async function claimQuest(questId) {
-  if (ui.busy || !state.char) return;
-  ui.busy = true; renderQuestBoard();
-
-  const prev = state.char;
-  try {
-    const result = await API.claim(state.char.id, questId);
-    state.char = result.character;
-    setConn(true); hideBanner();
-    markDone(state.char.id, questId);
-    logClaimOutcome(questId, prev, result);
-
-    // re-fetch quests if the character leveled up (new tiers may unlock)
-    if (result.character.currentLevel > prev.currentLevel) {
-      await loadQuests(result.character.currentLevel);
-    }
-
-    ui.checked = false; ui.busy = false;
-    render();
-  } catch (e) {
-    ui.busy = false; renderQuestBoard();
-    handleError(e, 'claim quest');
-  }
-}
-
-function logClaimOutcome(questId, prev, result) {
-  const next   = result.character;
-  const q      = quests.find(x => x.questId === questId) || { title: questId, targetStat: 'STR', baseStatXp: 0, baseCharacterXp: 0 };
-  const lc     = q.targetStat.toLowerCase();
-  const scale  = questXpScale(prev.currentLevel);
-  const mult   = multiplierFor(prev.streakCount);
-  const bonusMult = result.bonusChallenge ? 1.5 : 1;
-  const estStat   = Math.round(q.baseStatXp      * scale * mult * bonusMult);
-  const estChar   = Math.round(q.baseCharacterXp * scale * mult * bonusMult);
-
-  pushLog('quest', `Quest cleared — <span class="hl">${esc(q.title)}</span>`);
-  pushLog('quest', `<span class="c-${lc}">+${estStat} ${q.targetStat} XP</span> · +${estChar} Character XP <span style="color:var(--faint)">(x${(scale * mult * bonusMult).toFixed(2)})</span>`);
-
-  if (result.bonusChallenge) {
-    pushLog('bonus', `Bonus Challenge: <span class="hl">${esc(result.bonusChallenge.description)}</span> <span style="color:var(--wil)">+${result.bonusChallenge.bonusXp} bonus XP</span>`);
-  }
-
-  if (next.streakCount > prev.streakCount)
-    pushLog('system', `Streak extended — <span class="hl">DAY ${next.streakCount}</span>`);
-  else if (next.streakCount < prev.streakCount)
-    pushLog('decay', `Streak fractured — soft landing to <span class="hl">DAY ${next.streakCount}</span>`);
-
-  if (next.currentLevel > prev.currentLevel)
-    pushLog('level', `Operative ascends — <span class="hl">LV ${next.currentLevel}</span>`);
-
-  const prevByType = Object.fromEntries(prev.stats.map(s => [s.statType, s]));
-  next.stats.forEach(s => {
-    const p = prevByType[s.statType]; if (!p) return;
-    if (s.currentLevel > p.currentLevel)
-      pushLog('level', `<span class="c-${s.statType.toLowerCase()}">${s.statType}</span> levels up — <span class="hl">LV ${s.currentLevel}</span>`);
-    if ((p.status || '').toLowerCase() === 'rusty' && (s.status || '').toLowerCase() === 'active')
-      pushLog('system', `<span class="c-${s.statType.toLowerCase()}">${s.statType}</span> shakes off the rust — Active again`);
-  });
-}
-
-async function abandonRun() {
-  if (!state.char) return;
-  if (!confirm('Abandon this run? Your operative, all attributes, and logs will be permanently deleted.')) return;
-  try {
-    await API.remove(state.char.id);
-  } catch (e) {
-    if (e.status !== 404) { handleError(e, 'abandon run'); return; }
-  }
-  localStorage.removeItem(LS.log(state.char.id));
-  localStorage.removeItem(LS.done(state.char.id));
-  localStorage.removeItem(LS.charId);
-  state.char = null;
-  openOverlay('bind');
-}
-
-function handleError(e, action) {
-  const isNetwork = e instanceof TypeError;
-  setConn(false);
-  if (isNetwork) {
-    showBanner(`<b>Connection severed.</b> Could not reach the API at <b>${esc(apiBase())}</b>. Make sure the Spring Boot app is running, then use ⚙ to recheck the endpoint.`);
-    pushLog('error', `Connection severed while trying to ${esc(action)} — API unreachable at ${esc(apiBase())}`);
-  } else {
-    showBanner(`<b>Request failed.</b> ${esc(e.message)} (while trying to ${esc(action)}).`);
-    pushLog('error', `Failed to ${esc(action)}: ${esc(e.message)}`);
-  }
-}
-
-/* ========================== overlay ======================================= */
-let overlayMode = 'bind';
-function openOverlay(mode) {
-  overlayMode = mode;
-  $('#ovApi').value   = apiBase();
-  $('#ovErr').textContent = '';
-  if (mode === 'bind') {
-    $('#ovTitle').textContent = 'Bind Your Soul';
-    $('#ovSub').textContent   = 'Enter the API endpoint and forge a new operative. The Iron Path remembers nothing of the idle.';
-    $('#ovNameField').hidden  = false;
-    $('#ovName').value        = '';
-    $('#ovCancel').hidden     = true;
-    $('#ovSubmit').textContent = 'Bind Soul';
-  } else {
-    $('#ovTitle').textContent = 'API Settings';
-    $('#ovSub').textContent   = 'Point the terminal at a different Spring Boot instance, then reconnect.';
-    $('#ovNameField').hidden  = true;
-    $('#ovCancel').hidden     = false;
-    $('#ovSubmit').textContent = 'Save & Reconnect';
-  }
-  $('#overlay').classList.add('show');
-  ($('#ovNameField').hidden ? $('#ovApi') : $('#ovName')).focus();
-}
-function closeOverlay() { $('#overlay').classList.remove('show'); }
-
-async function submitOverlay() {
-  const base = $('#ovApi').value.trim();
-  if (!base) { $('#ovErr').textContent = 'API endpoint is required.'; return; }
-  localStorage.setItem(LS.api, base.replace(/\/+$/, ''));
-  const btn = $('#ovSubmit'); btn.disabled = true;
-  try {
-    if (overlayMode === 'bind') {
-      const name = $('#ovName').value.trim();
-      if (!name) { $('#ovErr').textContent = 'Give your operative a name.'; btn.disabled = false; return; }
-      const created = await API.create(name);
-      localStorage.setItem(LS.charId, created.id);
-      state.char = created;
-      saveLog(created.id, [{ category: 'system', html: `SYSTEM: Soul bound to <span class="hl">${esc(created.characterName)}</span>. Welcome to the Iron Path. Inactivity has consequences.` }]);
-      await loadQuests(created.currentLevel);
-    } else {
-      const id = localStorage.getItem(LS.charId);
-      state.char = await API.get(id);
-      await loadQuests(state.char.currentLevel);
-    }
-    setConn(true); hideBanner();
-    closeOverlay();
-    $('#app').hidden = false;
-    render();
-  } catch (e) {
-    btn.disabled = false;
-    const isNetwork = e instanceof TypeError;
-    $('#ovErr').textContent = isNetwork
-      ? `Cannot reach the API at ${apiBase()}. Is the server running?`
-      : (e.status === 404 ? 'That operative no longer exists on the server.' : e.message);
-    setConn(false);
-  } finally {
-    btn.disabled = false;
-  }
-}
-
-/* ========================== boot ========================================== */
-async function boot() {
-  $('#gearBtn').addEventListener('click',   () => openOverlay('settings'));
-  $('#abandonBtn').addEventListener('click', abandonRun);
-  $('#ovSubmit').addEventListener('click',   submitOverlay);
-  $('#ovCancel').addEventListener('click',   closeOverlay);
-  $('#overlay').addEventListener('keydown', e => {
-    if (e.key === 'Enter') submitOverlay();
-    if (e.key === 'Escape' && overlayMode === 'settings') closeOverlay();
-  });
-
-  const id = localStorage.getItem(LS.charId);
-  if (!id) { openOverlay('bind'); return; }
-
-  try {
-    state.char = await API.get(id);
-    await loadQuests(state.char.currentLevel);
-    setConn(true);
-    $('#app').hidden = false;
-    if (loadLog(id).length === 0)
-      saveLog(id, [{ category: 'system', html: `SYSTEM: Soul-link re-established with <span class="hl">${esc(state.char.characterName)}</span>.` }]);
-    render();
-  } catch (e) {
-    setConn(false);
-    $('#app').hidden = false;
-    if (e.status === 404) { localStorage.removeItem(LS.charId); openOverlay('bind'); }
-    else { handleError(e, 'load your operative'); openOverlay('settings'); }
-  }
-}
-boot();
-</script>
+<script src="js/app.js"></script>
 </body>
 </html>

@@ -29,6 +29,10 @@ public class Character {
     @Column(name = "id", updatable = false, nullable = false)
     private UUID id;
 
+    /** Owning player account. Null for characters created before player accounts existed. */
+    @Column(name = "user_id")
+    private UUID userId;
+
     @Column(name = "character_name", nullable = false)
     private String characterName;
 
@@ -99,6 +103,14 @@ public class Character {
 
     public void setId(UUID id) {
         this.id = id;
+    }
+
+    public UUID getUserId() {
+        return userId;
+    }
+
+    public void setUserId(UUID userId) {
+        this.userId = userId;
     }
 
     public String getCharacterName() {
