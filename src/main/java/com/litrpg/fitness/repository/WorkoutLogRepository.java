@@ -13,6 +13,8 @@ public interface WorkoutLogRepository extends JpaRepository<WorkoutLog, UUID> {
 
     List<WorkoutLog> findByCharacterIdOrderByLoggedAtDesc(UUID characterId);
 
+    long countByCharacterId(UUID characterId);
+
     boolean existsByCharacterIdAndQuestIdAndLoggedAtBetween(
             UUID characterId, String questId, LocalDateTime start, LocalDateTime end);
 

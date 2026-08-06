@@ -13,6 +13,9 @@
   <div class="app" id="app" hidden>
     <div class="topbar">
       <span class="conn"><span class="dot" id="connDot"></span><span id="connText">connecting…</span></span>
+      <button class="friends-link" id="openBadgesBtn">🏅 Badges</button>
+      <button class="friends-link" id="openLeaderboardBtn">🏆 Rankings</button>
+      <button class="friends-link" id="openCustomizeBtn">🎭 Customize</button>
       <button class="friends-link" id="openFriendsBtn">☍ Allies</button>
       <button class="friends-link" id="openAccountBtn">🔑 Account</button>
       <button class="friends-link" id="logoutBtn">⏻ Logout</button>
@@ -22,17 +25,19 @@
     <div class="banner" id="banner"></div>
 
     <!-- HUD -->
-    <section class="panel" aria-label="Character header">
+    <section class="panel" id="hudPanel" aria-label="Character header">
       <div class="hud__top">
         <div class="hud__id">
           <div class="eyebrow">Awakened Operative</div>
-          <h1 class="hud__name"><span id="charName">—</span>
-            <span class="lv-badge">LV <span id="charLevel">1</span> <span class="heart">♥</span></span>
+          <h1 class="hud__name"><span class="avatar-glyph" id="charAvatar">🐺</span><span id="charName">—</span>
+            <span class="lv-badge" id="lvBadge">LV <span id="charLevel">1</span> <span class="heart">♥</span></span>
           </h1>
+          <div class="hud__title" id="charTitle" hidden></div>
         </div>
         <div class="streak">
           <div class="streak__day"><span class="flame">🔥</span>DAY <span id="streakDay">0</span></div>
           <div class="streak__buff"><span id="buffVal">1.00</span>x XP Buff</div>
+          <div class="streak__freeze" id="streakFreeze" title="Preserves your streak instead of halving it if you miss a day">🧊 <span id="streakFreezeCount">0</span> freeze</div>
           <div class="streak__risk" id="streakRisk" hidden></div>
         </div>
       </div>
@@ -53,7 +58,9 @@
 
       <section class="panel" aria-label="Quest board">
         <span class="corner-tag">Daily</span>
-        <h2 class="panel-title"><span class="glyph">▣</span> Quest Board</h2>
+        <h2 class="panel-title"><span class="glyph">▣</span> Quest Board <button class="frow-btn" id="openSubmitQuestBtn" style="float:right; font-size:11px;">+ Submit a Quest</button></h2>
+        <div class="event-banner" id="eventBanner" hidden></div>
+        <div class="tag-chips" id="tagChips"></div>
         <div class="quest-list" id="questList"></div>
       </section>
     </div>
@@ -152,8 +159,124 @@
       <div class="overlay__actions">
         <button class="btn-primary" id="acctSubmit">Save</button>
       </div>
+      <hr style="border-color:var(--border); margin:20px 0;" />
+      <p class="overlay__sub">Only needed if this page is hosted separately from the API.</p>
+      <div class="field">
+        <label for="acctApiBase">API Base URL</label>
+        <input id="acctApiBase" type="text" placeholder="same origin (default)" autocomplete="off" />
+      </div>
+      <div class="overlay__actions">
+        <button class="btn-primary" id="acctApiBaseSave">Update Connection</button>
+      </div>
     </div>
   </div>
+
+  <!-- badges overlay -->
+  <div class="overlay" id="badgesOverlay">
+    <div class="panel overlay__card">
+      <button class="ov-close" id="badgesCloseBtn" aria-label="Close">✕</button>
+      <h2 class="panel-title"><span class="glyph">🏅</span> Badge Case</h2>
+      <p class="overlay__sub">Earned automatically as you play — nothing to claim, just keep training.</p>
+      <div class="overlay__err" id="badgesErr"></div>
+      <div class="badge-grid" id="badgeGrid"></div>
+    </div>
+  </div>
+
+  <!-- leaderboard overlay -->
+  <div class="overlay" id="leaderboardOverlay">
+    <div class="panel overlay__card friends-card">
+      <button class="ov-close" id="leaderboardCloseBtn" aria-label="Close">✕</button>
+      <h2 class="panel-title"><span class="glyph">🏆</span> Rankings</h2>
+
+      <div class="friends-tabs" id="lbScopeTabs">
+        <button class="ftab active" data-scope="global">Global</button>
+        <button class="ftab" data-scope="friends">Friends</button>
+      </div>
+      <div class="friends-tabs" id="lbMetricTabs" style="margin-top:-6px;">
+        <button class="ftab active" data-metric="level">By Level</button>
+        <button class="ftab" data-metric="xp">By Lifetime XP</button>
+        <button class="ftab" data-metric="streak">By Streak</button>
+      </div>
+
+      <div class="overlay__err" id="leaderboardErr"></div>
+      <div class="friend-list" id="leaderboardBody"></div>
+    </div>
+  </div>
+
+  <!-- submit a quest overlay -->
+  <div class="overlay" id="submitQuestOverlay">
+    <div class="panel overlay__card">
+      <button class="ov-close" id="submitQuestCloseBtn" aria-label="Close">✕</button>
+      <h2 class="panel-title"><span class="glyph">▣</span> Submit a Quest</h2>
+      <p class="overlay__sub">Sends your idea to the admin review queue — it won't appear on the board until approved.</p>
+      <div class="field">
+        <label for="sq-title">Title</label>
+        <input id="sq-title" type="text" maxlength="255" placeholder="e.g. Ruck March" />
+      </div>
+      <div class="field">
+        <label for="sq-desc">Description</label>
+        <input id="sq-desc" type="text" maxlength="1000" placeholder="What must be physically done?" />
+      </div>
+      <div class="field">
+        <label for="sq-stat">Target Stat</label>
+        <select id="sq-stat">
+          <option value="STR">STR — Strength</option>
+          <option value="DEX">DEX — Dexterity</option>
+          <option value="CON">CON — Constitution</option>
+          <option value="WIL">WIL — Willpower</option>
+        </select>
+      </div>
+      <div class="field">
+        <label for="sq-tag">Category Tag</label>
+        <select id="sq-tag">
+          <option value="">— none —</option>
+          <option value="QUICK">Quick</option>
+          <option value="INTENSE">Intense</option>
+          <option value="RECOVERY">Recovery</option>
+          <option value="STRENGTH">Strength</option>
+          <option value="CARDIO">Cardio</option>
+        </select>
+      </div>
+      <div class="field">
+        <label for="sq-minlevel">Min Level</label>
+        <input id="sq-minlevel" type="number" min="1" value="1" />
+      </div>
+      <div class="field">
+        <label for="sq-minutes">Estimated Minutes</label>
+        <input id="sq-minutes" type="number" min="1" placeholder="optional" />
+      </div>
+      <div class="overlay__err" id="submitQuestErr"></div>
+      <div class="overlay__actions">
+        <button class="btn-primary" id="submitQuestSaveBtn">Submit for Review</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- customization overlay -->
+  <div class="overlay" id="customizeOverlay">
+    <div class="panel overlay__card">
+      <button class="ov-close" id="customizeCloseBtn" aria-label="Close">✕</button>
+      <h2 class="panel-title"><span class="glyph">🎭</span> Customization</h2>
+      <p class="overlay__sub">Cosmetic only — no effect on gameplay.</p>
+      <div class="field">
+        <label>Avatar</label>
+        <div class="avatar-grid" id="avatarGrid"></div>
+      </div>
+      <div class="field">
+        <label for="titleSelect">Equipped Title</label>
+        <select id="titleSelect">
+          <option value="">— none —</option>
+        </select>
+      </div>
+      <div class="overlay__err" id="customizeErr"></div>
+      <div class="overlay__actions">
+        <button class="btn-primary" id="customizeSaveBtn">Save</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- achievement unlock toasts -->
+  <div class="toast-stack" id="toastStack"></div>
 
   <!-- friends overlay -->
   <div class="overlay" id="friendsOverlay">

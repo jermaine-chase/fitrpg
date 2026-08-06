@@ -1,5 +1,9 @@
 package com.litrpg.fitness.controller;
 
+import com.litrpg.fitness.dto.AchievementResponse;
+import com.litrpg.fitness.dto.ActivitySyncRequest;
+import com.litrpg.fitness.dto.ActivitySyncResponse;
+import com.litrpg.fitness.dto.CharacterCustomizationRequest;
 import com.litrpg.fitness.dto.CharacterSheetResponse;
 import com.litrpg.fitness.dto.ClaimQuestRequest;
 import com.litrpg.fitness.dto.ClaimRewardResponse;
@@ -8,6 +12,8 @@ import com.litrpg.fitness.dto.DailyQuestResponse;
 import com.litrpg.fitness.dto.WorkoutLogEntryResponse;
 import com.litrpg.fitness.model.Character;
 import com.litrpg.fitness.security.UserPrincipal;
+import com.litrpg.fitness.service.AchievementService;
+import com.litrpg.fitness.service.ActivitySyncService;
 import com.litrpg.fitness.service.CharacterService;
 import com.litrpg.fitness.service.DailyQuestService;
 import com.litrpg.fitness.service.GameEngineService;
@@ -19,6 +25,7 @@ import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -38,13 +45,19 @@ public class CharacterController {
     private final CharacterService characterService;
     private final GameEngineService gameEngineService;
     private final DailyQuestService dailyQuestService;
+    private final AchievementService achievementService;
+    private final ActivitySyncService activitySyncService;
 
     public CharacterController(CharacterService characterService,
                                GameEngineService gameEngineService,
-                               DailyQuestService dailyQuestService) {
+                               DailyQuestService dailyQuestService,
+                               AchievementService achievementService,
+                               ActivitySyncService activitySyncService) {
         this.characterService = characterService;
         this.gameEngineService = gameEngineService;
         this.dailyQuestService = dailyQuestService;
+        this.achievementService = achievementService;
+        this.activitySyncService = activitySyncService;
     }
 
     /**
@@ -124,6 +137,48 @@ public class CharacterController {
             @AuthenticationPrincipal UserPrincipal principal,
             @PathVariable UUID id) {
         return ResponseEntity.ok(characterService.getOwnedWorkoutHistory(id, principal.getId()));
+    }
+
+    /**
+     * The owned character's full badge catalog, locked entries included.
+     * {@code GET /api/character/{id}/achievements}
+     */
+    @GetMapping("/{id}/achievements")
+    public ResponseEntity<List<AchievementResponse>> getAchievements(
+            @AuthenticationPrincipal UserPrincipal principal,
+            @PathVariable UUID id) {
+        characterService.getOwnedCharacter(id, principal.getId());
+        return ResponseEntity.ok(achievementService.getCatalogForCharacter(id));
+    }
+
+    /**
+     * Sets the owned character's cosmetic avatar and equipped title (drawn
+     * from its own unlocked achievements). No gameplay effect.
+     * {@code PUT /api/character/{id}/customization}
+     */
+    @PutMapping("/{id}/customization")
+    public ResponseEntity<CharacterSheetResponse> updateCustomization(
+            @AuthenticationPrincipal UserPrincipal principal,
+            @PathVariable UUID id,
+            @Valid @RequestBody CharacterCustomizationRequest request) {
+        Character updated = characterService.updateCustomization(
+                id, principal.getId(), request.getAvatarId(), request.getTitleAchievementCode());
+        return ResponseEntity.ok(CharacterSheetResponse.from(updated));
+    }
+
+    /**
+     * Ingests steps/active-minutes from any source (self-reported today — no
+     * OAuth/device wiring yet) and converts activity above configurable
+     * thresholds into STR/CON XP through the normal reward pipeline. Guards
+     * against double-crediting the same (character, source, date) combination.
+     * {@code POST /api/character/{id}/activity-sync}
+     */
+    @PostMapping("/{id}/activity-sync")
+    public ResponseEntity<ActivitySyncResponse> syncActivity(
+            @AuthenticationPrincipal UserPrincipal principal,
+            @PathVariable UUID id,
+            @Valid @RequestBody ActivitySyncRequest request) {
+        return ResponseEntity.ok(activitySyncService.syncActivity(id, principal.getId(), request));
     }
 
     /**

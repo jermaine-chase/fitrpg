@@ -45,11 +45,23 @@ public class Character {
     @Column(name = "streak_count", nullable = false)
     private int streakCount = 0;
 
+    /** Grace tokens that preserve the streak on a missed day instead of halving it. */
+    @Column(name = "streak_freeze_count", nullable = false)
+    private int streakFreezeCount = 1;
+
     @Column(name = "last_workout_date")
     private LocalDate lastWorkoutDate;
 
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
+
+    /** Cosmetic only — no gameplay effect. Defaults to the first entry in the starter catalog. */
+    @Column(name = "avatar_id", nullable = false)
+    private String avatarId = "wolf";
+
+    /** Cosmetic only. Must be the code of one of this character's unlocked achievements, or null for none equipped. */
+    @Column(name = "title_achievement_code")
+    private String titleAchievementCode;
 
     /**
      * Eagerly loaded because virtually every read of a character also needs its
@@ -145,6 +157,14 @@ public class Character {
         this.streakCount = streakCount;
     }
 
+    public int getStreakFreezeCount() {
+        return streakFreezeCount;
+    }
+
+    public void setStreakFreezeCount(int streakFreezeCount) {
+        this.streakFreezeCount = streakFreezeCount;
+    }
+
     public LocalDate getLastWorkoutDate() {
         return lastWorkoutDate;
     }
@@ -159,6 +179,22 @@ public class Character {
 
     public void setCreatedAt(LocalDateTime createdAt) {
         this.createdAt = createdAt;
+    }
+
+    public String getAvatarId() {
+        return avatarId;
+    }
+
+    public void setAvatarId(String avatarId) {
+        this.avatarId = avatarId;
+    }
+
+    public String getTitleAchievementCode() {
+        return titleAchievementCode;
+    }
+
+    public void setTitleAchievementCode(String titleAchievementCode) {
+        this.titleAchievementCode = titleAchievementCode;
     }
 
     public List<CharacterStat> getStats() {

@@ -7,6 +7,7 @@ import com.litrpg.fitness.model.Character;
 import com.litrpg.fitness.model.CharacterStat;
 import com.litrpg.fitness.model.DailyQuestAssignment;
 import com.litrpg.fitness.model.Quest;
+import com.litrpg.fitness.model.QuestStatus;
 import com.litrpg.fitness.model.StatType;
 import com.litrpg.fitness.repository.CharacterRepository;
 import com.litrpg.fitness.repository.DailyQuestAssignmentRepository;
@@ -65,7 +66,8 @@ public class DailyQuestService {
         Character character = characterRepository.findById(characterId)
                 .orElseThrow(() -> new ResourceNotFoundException("Character not found: " + characterId));
 
-        List<Quest> unlocked = questRepository.findByMinLevelLessThanEqual(character.getCurrentLevel());
+        List<Quest> unlocked = questRepository.findByMinLevelLessThanEqualAndStatus(
+                character.getCurrentLevel(), QuestStatus.APPROVED);
         if (unlocked.isEmpty()) {
             throw new ResourceNotFoundException("No quests available for character " + characterId);
         }

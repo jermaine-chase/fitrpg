@@ -5,12 +5,42 @@ const LS = {
   token:   'ironpath_token',
   charId:  'ironpath_char_id',
   isAdmin: 'ironpath_is_admin',
+  apiBase: 'ironpath_api_base',
   log:     id => `ironpath_log_${id}`,
   done:    id => `ironpath_done_${id}`,
 };
-const API_BASE = 'http://localhost:8080';
+
+/*
+ * Same-origin by default (Spring serves this page itself), so the app works
+ * out of the box wherever it's deployed. If the frontend is ever hosted
+ * separately from the API, repoint it via a `?api=https://host` query param
+ * (persisted to localStorage on first use) or the API field in the Account
+ * overlay.
+ */
+function resolveApiBase() {
+  const fromQuery = new URLSearchParams(window.location.search).get('api');
+  if (fromQuery !== null) {
+    const trimmed = fromQuery.trim().replace(/\/+$/, '');
+    if (trimmed) localStorage.setItem(LS.apiBase, trimmed);
+    else localStorage.removeItem(LS.apiBase);
+    return trimmed;
+  }
+  return (localStorage.getItem(LS.apiBase) || '').replace(/\/+$/, '');
+}
+let API_BASE = resolveApiBase();
+function setApiBase(value) {
+  const trimmed = (value || '').trim().replace(/\/+$/, '');
+  if (trimmed) localStorage.setItem(LS.apiBase, trimmed);
+  else localStorage.removeItem(LS.apiBase);
+  API_BASE = trimmed;
+}
 const STAT_ORDER  = ['STR', 'DEX', 'CON', 'WIL'];
 const STAT_NAME   = { STR: 'Strength', DEX: 'Dexterity', CON: 'Constitution', WIL: 'Willpower' };
+const QUEST_TAGS  = ['QUICK', 'INTENSE', 'RECOVERY', 'STRENGTH', 'CARDIO'];
+const AVATAR_EMOJI = {
+  wolf: '🐺', phoenix: '🔥', serpent: '🐍', golem: '🗿', raven: '🐦', tiger: '🐯',
+  owl: '🦉', stag: '🦌', fox: '🦊', bear: '🐻', hawk: '🦅', turtle: '🐢',
+};
 
 const RANK_LABEL = minLevel => {
   if (minLevel >= 50) return 'B';
@@ -30,8 +60,53 @@ const todayStr        = () => { const d = new Date(); return `${d.getFullYear()}
 
 /* ========================== state ========================================= */
 let state = { char: null, history: [], daily: null, dailyBonusMultiplier: 1 };
-let ui    = { activeQuestId: null, checked: false, busy: false };
+let ui    = { activeQuestId: null, checked: false, busy: false, pendingLevelUp: false, tagFilter: null };
 let quests = [];
+let prevStatPct = {};
+
+/* ========================== audio cues (Web Audio API, no assets) ========== */
+let audioCtx = null;
+function getAudioCtx() {
+  const AC = window.AudioContext || window.webkitAudioContext;
+  if (!AC) return null;
+  if (!audioCtx) audioCtx = new AC();
+  if (audioCtx.state === 'suspended') audioCtx.resume().catch(() => {});
+  return audioCtx;
+}
+function playTone(freq, startOffset, duration, type, gainPeak) {
+  const ctx = getAudioCtx(); if (!ctx) return;
+  const osc = ctx.createOscillator();
+  const gain = ctx.createGain();
+  osc.type = type || 'sine';
+  osc.frequency.value = freq;
+  const t0 = ctx.currentTime + startOffset;
+  gain.gain.setValueAtTime(0.0001, t0);
+  gain.gain.linearRampToValueAtTime(gainPeak, t0 + 0.02);
+  gain.gain.exponentialRampToValueAtTime(0.0001, t0 + duration);
+  osc.connect(gain).connect(ctx.destination);
+  osc.start(t0);
+  osc.stop(t0 + duration + 0.05);
+}
+function playXpGainCue()   { playTone(660, 0, 0.09, 'sine', 0.05); }
+function playLevelUpCue()  { [523.25, 659.25, 783.99, 1046.5].forEach((f, i) => playTone(f, i * 0.09, 0.28, 'triangle', 0.16)); }
+function playBonusCue()    { playTone(987.77, 0, 0.12, 'sine', 0.11); playTone(1318.51, 0.08, 0.2, 'sine', 0.11); }
+
+/* ========================== visual feedback cues =========================== */
+function flashPanel(kind) {
+  const el = $('#hudPanel'); if (!el) return;
+  const cls = 'flash-' + kind;
+  el.classList.remove(cls);
+  void el.offsetWidth; // force reflow so the animation restarts if retriggered quickly
+  el.classList.add(cls);
+  setTimeout(() => el.classList.remove(cls), 1200);
+}
+function pulseLevelBadge() {
+  const el = $('#lvBadge'); if (!el) return;
+  el.classList.remove('pulse');
+  void el.offsetWidth;
+  el.classList.add('pulse');
+  setTimeout(() => el.classList.remove('pulse'), 800);
+}
 
 /* ========================== API layer ===================================== */
 async function apiFetch(path, options = {}) {
@@ -65,8 +140,13 @@ const API = {
   getMine: ()    => apiFetch('/api/character/mine'),
   claim:  (id, questId) => apiFetch(`/api/character/${id}/claim`, { method: 'POST', body: JSON.stringify({ questId }) }),
   history: id    => apiFetch(`/api/character/${id}/history`),
+  achievements: id => apiFetch(`/api/character/${id}/achievements`),
+  leaderboard: (scope, metric) => apiFetch(`/api/leaderboard?scope=${encodeURIComponent(scope)}&metric=${encodeURIComponent(metric)}`),
+  setCustomization: (id, avatarId, titleAchievementCode) => apiFetch(`/api/character/${id}/customization`, { method: 'PUT', body: JSON.stringify({ avatarId, titleAchievementCode }) }),
+  submitQuest: body => apiFetch('/api/quests/submit', { method: 'POST', body: JSON.stringify(body) }),
+  activeEvents: () => apiFetch('/api/events/active'),
   daily:   id    => apiFetch(`/api/character/${id}/daily`),
-  quests: level  => apiFetch('/api/quests?level=' + level),
+  quests: (level, tag) => apiFetch('/api/quests?level=' + level + (tag ? '&tag=' + encodeURIComponent(tag) : '')),
   remove: id     => apiFetch('/api/character/' + id, { method: 'DELETE' }),
 
   friends:          () => apiFetch('/api/friends'),
@@ -86,13 +166,29 @@ const API = {
 /* ========================== quest loading ================================= */
 async function loadQuests(level) {
   try {
-    quests = await API.quests(level);
+    quests = await API.quests(level, ui.tagFilter);
     if (ui.activeQuestId && !quests.find(q => q.questId === ui.activeQuestId)) {
       ui.activeQuestId = null;
     }
   } catch (_) {
     quests = [];
   }
+}
+
+async function setTagFilter(tag) {
+  ui.tagFilter = ui.tagFilter === tag ? null : tag;
+  await loadQuests(state.char.currentLevel);
+  render();
+}
+
+function renderTagChips() {
+  const el = $('#tagChips'); if (!el) return;
+  el.innerHTML = QUEST_TAGS.map(tag =>
+    `<span class="tag-chip ${ui.tagFilter === tag ? 'active' : ''}" data-tag="${tag}">${tag}</span>`
+  ).join('');
+  el.querySelectorAll('.tag-chip').forEach(chip => {
+    chip.addEventListener('click', () => setTagFilter(chip.dataset.tag));
+  });
 }
 
 /* ========================== admin link visibility =========================== */
@@ -225,23 +321,50 @@ function markDone(charId, questId) {
 }
 
 /* ========================== rendering ===================================== */
-function render() { renderHud(); renderStats(); renderQuestBoard(); renderLog(); renderProgress(); }
+function render() { renderHud(); renderStats(); renderEventBanner(); renderTagChips(); renderQuestBoard(); renderLog(); renderProgress(); }
 
 function renderHud() {
   const c = state.char; if (!c) return;
+  $('#charAvatar').textContent = AVATAR_EMOJI[c.avatarId] || '🐺';
+  const titleEl = $('#charTitle');
+  const titleName = c.titleAchievementCode ? titleNameFor(c.titleAchievementCode) : null;
+  titleEl.hidden = !titleName;
+  if (titleName) titleEl.textContent = `“${titleName}”`;
   $('#charName').textContent  = c.characterName;
   $('#charLevel').textContent = c.currentLevel;
   $('#charXp').textContent    = c.overallXp;
   $('#charXpMax').textContent = c.xpForNextLevel;
-  $('#charXpFill').style.width = pct(c.overallXp, c.xpForNextLevel) + '%';
+
+  const fill = $('#charXpFill');
+  const targetPct = pct(c.overallXp, c.xpForNextLevel);
+  if (ui.pendingLevelUp) {
+    // Fill to 100% (old level), snap back to empty, then animate up to the
+    // carried-over XP so a level-up reads as "topped off, then restarted".
+    ui.pendingLevelUp = false;
+    fill.style.transition = 'none';
+    fill.style.width = '100%';
+    requestAnimationFrame(() => {
+      fill.style.transition = 'none';
+      fill.style.width = '0%';
+      requestAnimationFrame(() => {
+        fill.style.transition = '';
+        fill.style.width = targetPct + '%';
+      });
+    });
+  } else {
+    fill.style.width = targetPct + '%';
+  }
   $('#streakDay').textContent = c.streakCount;
   $('#buffVal').textContent   = multiplierFor(c.streakCount).toFixed(2);
+  $('#streakFreezeCount').textContent = c.streakFreezesAvailable;
 
   const riskEl = $('#streakRisk');
   const atRisk = c.streakCount > 0 && c.lastWorkoutDate !== todayStr();
   riskEl.hidden = !atRisk;
   if (atRisk) {
-    riskEl.textContent = `Streak open until midnight — one quest keeps DAY ${c.streakCount} going. A missed day halves it, it won't reset to zero.`;
+    riskEl.textContent = c.streakFreezesAvailable > 0
+      ? `Streak open until midnight — one quest keeps DAY ${c.streakCount} going. A missed day would burn a 🧊 freeze to preserve it instead of halving.`
+      : `Streak open until midnight — one quest keeps DAY ${c.streakCount} going. A missed day halves it, it won't reset to zero.`;
   }
 }
 
@@ -252,6 +375,11 @@ function renderStats() {
     const s = byType[type]; if (!s) return '';
     const rusty = (s.status || '').toLowerCase() === 'rusty';
     const lc = type.toLowerCase();
+    const target = pct(s.currentXp, s.xpForNextLevel);
+    // Rebuilt from scratch each render, so start the bar at its previous width
+    // (if known) and animate to the target on the next frame — otherwise the
+    // CSS width transition has no "before" state to animate from.
+    const start = prevStatPct[type] != null ? prevStatPct[type] : target;
     return `
       <div class="stat">
         <div class="stat__head">
@@ -260,16 +388,30 @@ function renderStats() {
           <span class="stat__lv">LV ${s.currentLevel}</span>
           <span class="stat__status ${rusty ? 'is-rusty' : 'is-active'}">${rusty ? 'Rusty' : 'Active'}</span>
         </div>
-        <div class="bar stat__bar"><div class="bar__fill fill-${lc}" style="width:${pct(s.currentXp, s.xpForNextLevel)}%"></div></div>
+        <div class="bar stat__bar"><div class="bar__fill fill-${lc}" data-target="${target}" style="width:${start}%"></div></div>
         <div class="stat__xp">${s.currentXp} / ${s.xpForNextLevel} XP</div>
       </div>`;
   }).join('');
+
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => {
+      $('#statList').querySelectorAll('.bar__fill[data-target]').forEach(el => {
+        el.style.width = el.dataset.target + '%';
+      });
+    });
+  });
+  STAT_ORDER.forEach(type => {
+    const s = byType[type];
+    if (s) prevStatPct[type] = pct(s.currentXp, s.xpForNextLevel);
+  });
 }
 
 function renderQuestBoard() {
   const c = state.char;
   if (!c || quests.length === 0) {
-    $('#questList').innerHTML = '<p class="quest-empty">No quests available — check API connection.</p>';
+    $('#questList').innerHTML = ui.tagFilter
+      ? `<p class="quest-empty">No ${esc(ui.tagFilter)} quests unlocked yet.</p>`
+      : '<p class="quest-empty">No quests available — check API connection.</p>';
     return;
   }
 
@@ -284,16 +426,18 @@ function renderQuestBoard() {
     const isActive = q.questId === ui.activeQuestId;
     const isDaily  = q.questId === state.daily && !cleared;
     const dailyMult = isDaily ? state.dailyBonusMultiplier : 1;
-    const estStat  = Math.round(q.baseStatXp      * scale * mult * dailyMult);
-    const estChar  = Math.round(q.baseCharacterXp * scale * mult * dailyMult);
+    const eventMult = eventMultiplierFor(q.targetStat);
+    const estStat  = Math.round(q.baseStatXp      * scale * mult * dailyMult * eventMult);
+    const estChar  = Math.round(q.baseCharacterXp * scale * mult * dailyMult * eventMult);
 
     return `
       <div class="qcard ${isActive ? 'is-active' : ''} ${cleared ? 'is-cleared' : ''} ${isDaily ? 'is-daily' : ''}" data-qid="${esc(q.questId)}">
         <div class="qcard__header">
           <span class="qcard__rank c-${lc}">${rank}·${q.targetStat}</span>
+          ${q.tag ? `<span class="tag-chip" style="cursor:default;">${esc(q.tag)}</span>` : ''}
           ${isDaily ? '<span class="daily-badge" title="Bonus XP for completing today\'s Daily Focus">★ Daily Focus</span>' : ''}
           <span class="qcard__title">${esc(q.title)}</span>
-          <span class="qcard__meta">~${estStat+estChar} XP</span>
+          <span class="qcard__meta">${q.estimatedMinutes ? `~${q.estimatedMinutes}min · ` : ''}~${estStat+estChar} XP</span>
           <span class="qcard__chevron">▾</span>
         </div>
         <div class="qcard__body">
@@ -305,7 +449,7 @@ function renderQuestBoard() {
               <span class="obj__text">Complete the objective above</span>
             </label>`}
           <div class="rewards">
-            <div class="rewards__label">Rewards · ${mult.toFixed(2)}x streak · ${scale.toFixed(1)}x level${isDaily ? ` · ${dailyMult.toFixed(2)}x daily focus` : ''}</div>
+            <div class="rewards__label">Rewards · ${mult.toFixed(2)}x streak · ${scale.toFixed(1)}x level${eventMult !== 1 ? ` · ${eventMult.toFixed(2)}x event` : ''}${isDaily ? ` · ${dailyMult.toFixed(2)}x daily focus` : ''}</div>
             <div class="rewards__line">
               <span class="reward c-${lc}">~+${estStat} ${q.targetStat} XP</span>
               <span class="reward">~+${estChar} Character XP</span>
@@ -356,7 +500,8 @@ function renderLog() {
 function setConn(ok) {
   const dot = $('#connDot'), txt = $('#connText');
   dot.className = 'dot ' + (ok ? 'ok' : 'bad');
-  txt.textContent = ok ? 'linked · ' + apiBase().replace(/^https?:\/\//, '') : 'offline';
+  const label = apiBase() ? apiBase().replace(/^https?:\/\//, '') : 'same origin';
+  txt.textContent = ok ? 'linked · ' + label : 'offline';
 }
 function showBanner(msg) { const b = $('#banner'); b.innerHTML = msg; b.classList.add('show'); }
 function hideBanner()    { $('#banner').classList.remove('show'); }
@@ -374,8 +519,19 @@ async function claimQuest(questId) {
     markDone(state.char.id, questId);
     logClaimOutcome(questId, prev, result);
 
+    const leveledUp = result.character.currentLevel > prev.currentLevel;
+    const bonusRolled = !!result.bonusChallenge;
+    ui.pendingLevelUp = leveledUp;
+    if (leveledUp) { playLevelUpCue(); flashPanel('levelup'); pulseLevelBadge(); }
+    else playXpGainCue();
+    if (bonusRolled) { playBonusCue(); flashPanel('bonus'); }
+    if (result.newAchievements && result.newAchievements.length > 0) {
+      showAchievementToasts(result.newAchievements);
+      result.newAchievements.forEach(a => pushLog('system', `🏅 Badge unlocked — <span class="hl">${esc(a.name)}</span>`));
+    }
+
     // re-fetch quests if the character leveled up (new tiers may unlock)
-    if (result.character.currentLevel > prev.currentLevel) {
+    if (leveledUp) {
       await loadQuests(result.character.currentLevel);
     }
 
@@ -414,6 +570,10 @@ function logClaimOutcome(questId, prev, result) {
     pushLog('system', `Streak extended — <span class="hl">DAY ${next.streakCount}</span>`);
   else if (next.streakCount < prev.streakCount)
     pushLog('decay', `Streak fractured — soft landing to <span class="hl">DAY ${next.streakCount}</span>`);
+  else if (next.streakFreezesAvailable < prev.streakFreezesAvailable)
+    pushLog('system', `🧊 Streak freeze consumed — <span class="hl">DAY ${next.streakCount}</span> preserved (${next.streakFreezesAvailable} left)`);
+  if (next.streakFreezesAvailable > prev.streakFreezesAvailable)
+    pushLog('system', `🧊 Streak freeze earned — <span class="hl">${next.streakFreezesAvailable} available</span>`);
 
   if (next.currentLevel > prev.currentLevel)
     pushLog('level', `Operative ascends — <span class="hl">LV ${next.currentLevel}</span>`);
@@ -471,8 +631,9 @@ function handleError(e, action) {
   const isNetwork = e instanceof TypeError;
   setConn(false);
   if (isNetwork) {
-    showBanner(`<b>Connection severed.</b> Could not reach the API at <b>${esc(apiBase())}</b>. Make sure the Spring Boot app is running, then reload the page.`);
-    pushLog('error', `Connection severed while trying to ${esc(action)} — API unreachable at ${esc(apiBase())}`);
+    const label = apiBase() || 'same origin';
+    showBanner(`<b>Connection severed.</b> Could not reach the API at <b>${esc(label)}</b>. Make sure the Spring Boot app is running, then reload the page.`);
+    pushLog('error', `Connection severed while trying to ${esc(action)} — API unreachable at ${esc(label)}`);
   } else {
     showBanner(`<b>Request failed.</b> ${esc(e.message)} (while trying to ${esc(action)}).`);
     pushLog('error', `Failed to ${esc(action)}: ${esc(e.message)}`);
@@ -558,6 +719,8 @@ async function enterAppWithNewCharacter(name) {
   await loadQuests(created.currentLevel);
   await loadProgress();
   await loadDailyQuest();
+  await loadActiveEvents();
+  await refreshAchievementCatalog();
   setConn(true); hideBanner();
   closeOverlay();
   $('#app').hidden = false;
@@ -574,6 +737,8 @@ async function enterAppAfterLogin() {
     await loadQuests(char.currentLevel);
     await loadProgress();
     await loadDailyQuest();
+    await loadActiveEvents();
+    await refreshAchievementCatalog();
     setConn(true); hideBanner();
     closeOverlay();
     $('#app').hidden = false;
@@ -642,7 +807,7 @@ async function submitOverlay() {
   } catch (e) {
     const isNetwork = e instanceof TypeError;
     $('#ovErr').textContent = isNetwork
-      ? `Cannot reach the API at ${apiBase()}. Is the server running?`
+      ? `Cannot reach the API at ${apiBase() || 'same origin'}. Is the server running?`
       : (e.status === 409 ? 'That username is already taken.'
         : e.status === 401 ? (overlayMode === 'forgot2' ? 'Incorrect answer.' : 'Invalid username or password.')
         : e.status === 404 ? 'No recovery question found for that username.'
@@ -659,6 +824,7 @@ async function openAccountOverlay() {
   $('#acctCurrentPassword').value = '';
   $('#acctQuestion').value = '';
   $('#acctAnswer').value = '';
+  $('#acctApiBase').value = API_BASE;
   $('#accountOverlay').classList.add('show');
   try {
     const res = await API.getSecurityQuestion();
@@ -689,6 +855,219 @@ async function submitAccountOverlay() {
   } finally {
     btn.disabled = false;
   }
+}
+
+function saveApiBaseFromAccount() {
+  setApiBase($('#acctApiBase').value);
+  $('#acctApiBase').value = API_BASE;
+  setConn(true);
+  pushLog('system', `SYSTEM: API base updated to <span class="hl">${esc(API_BASE || 'same origin')}</span>. Reload to reconnect.`);
+}
+
+/* ========================== badges ========================================= */
+let achievementCatalog = []; // cached full catalog (locked + unlocked); also feeds the title picker
+function titleNameFor(code) {
+  const a = achievementCatalog.find(x => x.code === code);
+  return a ? a.name : code;
+}
+async function refreshAchievementCatalog() {
+  try { achievementCatalog = await API.achievements(state.char.id); } catch (_) { achievementCatalog = []; }
+}
+
+async function openBadges() {
+  $('#badgesErr').textContent = '';
+  $('#badgeGrid').innerHTML = '<div class="friend-empty">Loading…</div>';
+  $('#badgesOverlay').classList.add('show');
+  try {
+    await refreshAchievementCatalog();
+    renderBadgeGrid(achievementCatalog);
+  } catch (e) {
+    $('#badgeGrid').innerHTML = '';
+    $('#badgesErr').textContent = e.message || 'Failed to load badges.';
+  }
+}
+function closeBadges() { $('#badgesOverlay').classList.remove('show'); }
+
+function renderBadgeGrid(badges) {
+  $('#badgeGrid').innerHTML = badges.map(b => `
+    <div class="badge-tile ${b.unlocked ? 'unlocked' : 'locked'}">
+      <div class="badge-tile__icon">${b.unlocked ? esc(b.icon) : '❔'}</div>
+      <div class="badge-tile__name">${esc(b.name)}</div>
+      <div class="badge-tile__desc">${esc(b.description)}</div>
+      ${b.unlocked ? `<div class="badge-tile__date">${esc((b.unlockedAt || '').slice(0, 10))}</div>` : ''}
+    </div>`).join('');
+}
+
+/* Toast shown when a claim unlocks one or more badges — result.newAchievements
+   from the claim response, rendered without a round trip to the catalog. */
+function showAchievementToasts(achievements) {
+  const stack = $('#toastStack');
+  achievements.forEach((a, i) => {
+    setTimeout(() => {
+      const el = document.createElement('div');
+      el.className = 'toast';
+      el.innerHTML = `
+        <span class="toast__icon">${esc(a.icon)}</span>
+        <span>
+          <div class="toast__title">Badge Unlocked</div>
+          <div class="toast__name">${esc(a.name)}</div>
+          <div class="toast__desc">${esc(a.description)}</div>
+        </span>`;
+      stack.appendChild(el);
+      setTimeout(() => el.remove(), 5100);
+    }, i * 300);
+  });
+}
+
+/* ========================== timed events ===================================== */
+let activeEvents = [];
+
+async function loadActiveEvents() {
+  try { activeEvents = await API.activeEvents(); } catch (_) { activeEvents = []; }
+}
+
+/** Combined multiplier from every currently-active event applicable to a stat (1 if none). */
+function eventMultiplierFor(statType) {
+  return activeEvents
+    .filter(e => !e.appliesToStat || e.appliesToStat === statType)
+    .reduce((m, e) => m * Number(e.xpMultiplier), 1);
+}
+
+function renderEventBanner() {
+  const el = $('#eventBanner');
+  if (activeEvents.length === 0) { el.hidden = true; return; }
+  el.hidden = false;
+  el.innerHTML = activeEvents.map(e => {
+    const scope = e.appliesToStat ? ` (${e.appliesToStat} only)` : '';
+    return `<span><span class="event-banner__glyph">✨</span> <b>${esc(e.name)}</b> — ${Number(e.xpMultiplier).toFixed(2)}x XP${scope}</span>`;
+  }).join(' &nbsp;·&nbsp; ');
+}
+
+/* ========================== quest submission ================================= */
+function openSubmitQuest() {
+  $('#submitQuestErr').textContent = '';
+  $('#sq-title').value = '';
+  $('#sq-desc').value = '';
+  $('#sq-stat').value = 'STR';
+  $('#sq-tag').value = '';
+  $('#sq-minlevel').value = '1';
+  $('#sq-minutes').value = '';
+  $('#submitQuestOverlay').classList.add('show');
+}
+function closeSubmitQuest() { $('#submitQuestOverlay').classList.remove('show'); }
+
+async function submitQuestIdea() {
+  const btn = $('#submitQuestSaveBtn'); btn.disabled = true;
+  $('#submitQuestErr').textContent = '';
+  try {
+    const title = $('#sq-title').value.trim();
+    if (!title) { $('#submitQuestErr').textContent = 'Give your quest a title.'; return; }
+    await API.submitQuest({
+      title,
+      description: $('#sq-desc').value.trim(),
+      targetStat: $('#sq-stat').value,
+      tag: $('#sq-tag').value || null,
+      minLevel: parseInt($('#sq-minlevel').value, 10) || 1,
+      estimatedMinutes: $('#sq-minutes').value ? parseInt($('#sq-minutes').value, 10) : null,
+    });
+    closeSubmitQuest();
+    pushLog('system', `SYSTEM: Quest idea "<span class="hl">${esc(title)}</span>" sent for admin review.`);
+  } catch (e) {
+    $('#submitQuestErr').textContent = e.message || 'Failed to submit quest.';
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+/* ========================== customization =================================== */
+let customizeSelectedAvatar = null;
+
+async function openCustomize() {
+  $('#customizeErr').textContent = '';
+  customizeSelectedAvatar = state.char.avatarId;
+  renderAvatarGrid();
+  $('#customizeOverlay').classList.add('show');
+  await refreshAchievementCatalog();
+  const unlocked = achievementCatalog.filter(a => a.unlocked);
+  $('#titleSelect').innerHTML = '<option value="">— none —</option>'
+    + unlocked.map(a => `<option value="${esc(a.code)}">${esc(a.icon)} ${esc(a.name)}</option>`).join('');
+  $('#titleSelect').value = state.char.titleAchievementCode || '';
+}
+function closeCustomize() { $('#customizeOverlay').classList.remove('show'); }
+
+function renderAvatarGrid() {
+  const grid = $('#avatarGrid');
+  grid.innerHTML = Object.keys(AVATAR_EMOJI).map(id =>
+    `<div class="avatar-choice ${id === customizeSelectedAvatar ? 'selected' : ''}" data-avatar="${id}" title="${id}">${AVATAR_EMOJI[id]}</div>`
+  ).join('');
+  grid.querySelectorAll('.avatar-choice').forEach(el => {
+    el.addEventListener('click', () => { customizeSelectedAvatar = el.dataset.avatar; renderAvatarGrid(); });
+  });
+}
+
+async function saveCustomization() {
+  const btn = $('#customizeSaveBtn'); btn.disabled = true;
+  $('#customizeErr').textContent = '';
+  try {
+    const titleCode = $('#titleSelect').value || null;
+    const updated = await API.setCustomization(state.char.id, customizeSelectedAvatar, titleCode);
+    state.char = updated;
+    closeCustomize();
+    renderHud();
+    pushLog('system', 'SYSTEM: Appearance updated.');
+  } catch (e) {
+    $('#customizeErr').textContent = e.message || 'Failed to save customization.';
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+/* ========================== leaderboard ===================================== */
+const LB_METRIC_LABEL = { level: 'LV', xp: 'XP', streak: 'DAY' };
+let lbState = { scope: 'global', metric: 'level' };
+
+function openLeaderboard() {
+  $('#leaderboardOverlay').classList.add('show');
+  loadLeaderboard();
+}
+function closeLeaderboard() { $('#leaderboardOverlay').classList.remove('show'); }
+
+async function loadLeaderboard() {
+  $('#leaderboardErr').textContent = '';
+  $('#leaderboardBody').innerHTML = '<div class="friend-empty">Loading…</div>';
+  try {
+    const rows = await API.leaderboard(lbState.scope, lbState.metric);
+    renderLeaderboard(rows);
+  } catch (e) {
+    $('#leaderboardBody').innerHTML = '';
+    $('#leaderboardErr').textContent = e.message || 'Failed to load rankings.';
+  }
+}
+
+function renderLeaderboard(rows) {
+  const body = $('#leaderboardBody');
+  if (rows.length === 0) {
+    body.innerHTML = '<div class="friend-empty">No ranked operatives yet.</div>';
+    return;
+  }
+  const unit = LB_METRIC_LABEL[lbState.metric] || '';
+  body.innerHTML = rows.map(r => `
+    <div class="frow" style="cursor:default;">
+      <span class="frow__meta" style="width:28px; flex:none;">#${r.rank}</span>
+      <span class="frow__name" style="cursor:default; flex:1;">${esc(r.characterName)} <span class="frow__meta">@${esc(r.username)}</span></span>
+      <span class="frow__meta">${r.value} ${unit}</span>
+    </div>`).join('');
+}
+
+function switchLeaderboardScope(scope) {
+  lbState.scope = scope;
+  $('#lbScopeTabs').querySelectorAll('.ftab').forEach(b => b.classList.toggle('active', b.dataset.scope === scope));
+  loadLeaderboard();
+}
+function switchLeaderboardMetric(metric) {
+  lbState.metric = metric;
+  $('#lbMetricTabs').querySelectorAll('.ftab').forEach(b => b.classList.toggle('active', b.dataset.metric === metric));
+  loadLeaderboard();
 }
 
 /* ========================== friends ======================================== */
@@ -926,6 +1305,12 @@ async function handleFriendsChange(e) {
 
 /* ========================== boot ========================================== */
 async function boot() {
+  // Browsers require a user gesture before audio can play; unlock the
+  // AudioContext on the very first click anywhere so later async cues
+  // (which fire after an awaited API call, outside the original gesture)
+  // aren't silently blocked.
+  document.addEventListener('click', () => getAudioCtx(), { once: true });
+
   $('#abandonBtn').addEventListener('click', abandonRun);
   $('#logoutBtn').addEventListener('click', logoutUser);
   $('#ovSubmit').addEventListener('click',   submitOverlay);
@@ -935,11 +1320,28 @@ async function boot() {
   $('#ovToggleMode').addEventListener('click', e => { e.preventDefault(); toggleOverlayMode(); });
   $('#ovForgotLink').addEventListener('click', e => { e.preventDefault(); openOverlay('forgot'); });
 
+  $('#openBadgesBtn').addEventListener('click', openBadges);
+  $('#badgesCloseBtn').addEventListener('click', closeBadges);
+  $('#badgesOverlay').addEventListener('click', e => { if (e.target.id === 'badgesOverlay') closeBadges(); });
+  $('#openCustomizeBtn').addEventListener('click', openCustomize);
+  $('#customizeCloseBtn').addEventListener('click', closeCustomize);
+  $('#customizeOverlay').addEventListener('click', e => { if (e.target.id === 'customizeOverlay') closeCustomize(); });
+  $('#customizeSaveBtn').addEventListener('click', saveCustomization);
+  $('#openSubmitQuestBtn').addEventListener('click', openSubmitQuest);
+  $('#submitQuestCloseBtn').addEventListener('click', closeSubmitQuest);
+  $('#submitQuestOverlay').addEventListener('click', e => { if (e.target.id === 'submitQuestOverlay') closeSubmitQuest(); });
+  $('#submitQuestSaveBtn').addEventListener('click', submitQuestIdea);
+  $('#openLeaderboardBtn').addEventListener('click', openLeaderboard);
+  $('#leaderboardCloseBtn').addEventListener('click', closeLeaderboard);
+  $('#leaderboardOverlay').addEventListener('click', e => { if (e.target.id === 'leaderboardOverlay') closeLeaderboard(); });
+  $('#lbScopeTabs').querySelectorAll('.ftab').forEach(b => b.addEventListener('click', () => switchLeaderboardScope(b.dataset.scope)));
+  $('#lbMetricTabs').querySelectorAll('.ftab').forEach(b => b.addEventListener('click', () => switchLeaderboardMetric(b.dataset.metric)));
   $('#openFriendsBtn').addEventListener('click', openFriends);
   $('#openAccountBtn').addEventListener('click', openAccountOverlay);
   $('#accountCloseBtn').addEventListener('click', closeAccountOverlay);
   $('#accountOverlay').addEventListener('click', e => { if (e.target.id === 'accountOverlay') closeAccountOverlay(); });
   $('#acctSubmit').addEventListener('click', submitAccountOverlay);
+  $('#acctApiBaseSave').addEventListener('click', saveApiBaseFromAccount);
   $('#friendsCloseBtn').addEventListener('click', closeFriends);
   $('#friendsOverlay').addEventListener('click', e => { if (e.target.id === 'friendsOverlay') closeFriends(); });
   $('#friendDetailBack').addEventListener('click', () => switchFriendsTab('list'));
@@ -959,7 +1361,9 @@ async function boot() {
     await loadQuests(state.char.currentLevel);
     await loadProgress();
     await loadDailyQuest();
+    await loadActiveEvents();
     await refreshAdminFlag();
+    await refreshAchievementCatalog();
     setConn(true);
     $('#app').hidden = false;
     if (loadLog(id).length === 0)

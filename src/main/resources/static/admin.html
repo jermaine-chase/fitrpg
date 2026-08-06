@@ -33,6 +33,8 @@
       <div class="topbar__title">Command Interface</div>
     </div>
     <div class="topbar__actions">
+      <input id="apiBaseInput" type="text" placeholder="API base (same origin)" title="Override the API base URL — shared with the Operative Terminal" style="width:200px;" />
+      <button class="btn-ghost btn" id="apiBaseSaveBtn">Set API</button>
       <a class="btn-ghost btn" href="index.html">← Operative Terminal</a>
       <button class="btn-ghost btn" id="logoutBtn">Logout</button>
     </div>
@@ -40,6 +42,57 @@
 
   <div class="page">
     <div class="flash" id="flash"></div>
+
+    <!-- ---- Timed Events ------------------------------------------------------ -->
+    <section class="panel">
+      <div class="section-head">
+        <h2 class="panel-title"><span class="glyph">✨</span> Timed Events</h2>
+        <button class="btn" id="addEventBtn">+ Add Event</button>
+      </div>
+      <div class="tbl-wrap">
+        <table id="eventTable">
+          <thead>
+            <tr>
+              <th>Name</th>
+              <th>Starts</th>
+              <th>Ends</th>
+              <th style="text-align:right">Multiplier</th>
+              <th>Applies To</th>
+              <th style="text-align:right">Actions</th>
+            </tr>
+          </thead>
+          <tbody id="eventTbody">
+            <tr class="empty-row"><td colspan="6">Loading events…</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- ---- Pending Quest Submissions ---------------------------------------- -->
+    <section class="panel">
+      <div class="section-head">
+        <h2 class="panel-title"><span class="glyph">⏳</span> Pending Quest Submissions</h2>
+        <button class="btn btn-ghost" id="refreshPendingBtn">↻ Refresh</button>
+      </div>
+      <div class="tbl-wrap">
+        <table id="pendingTable">
+          <thead>
+            <tr>
+              <th>Title</th>
+              <th>Description</th>
+              <th>Stat</th>
+              <th>Min Lvl</th>
+              <th style="text-align:right">Char XP</th>
+              <th style="text-align:right">Stat XP</th>
+              <th style="text-align:right">Actions</th>
+            </tr>
+          </thead>
+          <tbody id="pendingTbody">
+            <tr class="empty-row"><td colspan="7">Loading submissions…</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
 
     <!-- ---- Quest Catalog -------------------------------------------------- -->
     <section class="panel">
@@ -56,13 +109,15 @@
               <th>Description</th>
               <th>Stat</th>
               <th>Min Lvl</th>
+              <th>Tag</th>
+              <th>Status</th>
               <th style="text-align:right">Char XP</th>
               <th style="text-align:right">Stat XP</th>
               <th style="text-align:right">Actions</th>
             </tr>
           </thead>
           <tbody id="questTbody">
-            <tr class="empty-row"><td colspan="8">Loading quests…</td></tr>
+            <tr class="empty-row"><td colspan="10">Loading quests…</td></tr>
           </tbody>
         </table>
       </div>
@@ -135,6 +190,21 @@
         <label for="qf-statxp">Base Stat XP</label>
         <input id="qf-statxp" type="number" min="0" value="50" />
       </div>
+      <div class="field">
+        <label for="qf-tag">Category Tag</label>
+        <select id="qf-tag">
+          <option value="">— none —</option>
+          <option value="QUICK">Quick</option>
+          <option value="INTENSE">Intense</option>
+          <option value="RECOVERY">Recovery</option>
+          <option value="STRENGTH">Strength</option>
+          <option value="CARDIO">Cardio</option>
+        </select>
+      </div>
+      <div class="field">
+        <label for="qf-minutes">Estimated Minutes</label>
+        <input id="qf-minutes" type="number" min="1" placeholder="optional" />
+      </div>
     </div>
     <div class="modal-err" id="questModalErr"></div>
     <div class="modal-actions">
@@ -172,6 +242,47 @@
     <div class="modal-actions">
       <button class="btn-ghost btn" id="charModalCancel">Cancel</button>
       <button class="btn" id="charModalSave">Save Changes</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===================== EVENT MODAL ========================================= -->
+<div class="overlay" id="eventOverlay">
+  <div class="panel modal">
+    <h2 class="panel-title" id="eventModalTitle"><span class="glyph">✨</span> Add Event</h2>
+    <p class="modal-sub">Multiplier stacks on top of the streak bonus and bonus-challenge roll.</p>
+    <div class="form-grid">
+      <div class="field span-2">
+        <label for="ef-name">Name *</label>
+        <input id="ef-name" type="text" placeholder="e.g. Double XP Weekend" maxlength="255" />
+      </div>
+      <div class="field">
+        <label for="ef-start">Starts *</label>
+        <input id="ef-start" type="datetime-local" />
+      </div>
+      <div class="field">
+        <label for="ef-end">Ends *</label>
+        <input id="ef-end" type="datetime-local" />
+      </div>
+      <div class="field">
+        <label for="ef-mult">XP Multiplier *</label>
+        <input id="ef-mult" type="number" min="0.1" step="0.1" value="2.0" />
+      </div>
+      <div class="field">
+        <label for="ef-stat">Applies To</label>
+        <select id="ef-stat">
+          <option value="">All Stats</option>
+          <option value="STR">STR — Strength</option>
+          <option value="DEX">DEX — Dexterity</option>
+          <option value="CON">CON — Constitution</option>
+          <option value="WIL">WIL — Willpower</option>
+        </select>
+      </div>
+    </div>
+    <div class="modal-err" id="eventModalErr"></div>
+    <div class="modal-actions">
+      <button class="btn-ghost btn" id="eventModalCancel">Cancel</button>
+      <button class="btn" id="eventModalSave">Save Event</button>
     </div>
   </div>
 </div>

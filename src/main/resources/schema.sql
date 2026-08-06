@@ -49,6 +49,14 @@ CREATE TABLE IF NOT EXISTS characters (
 -- Add user_id to existing characters tables that predate player accounts.
 ALTER TABLE characters ADD COLUMN IF NOT EXISTS user_id UUID REFERENCES users (id) ON DELETE CASCADE;
 
+-- Grace tokens that preserve a streak on a missed day instead of halving it.
+ALTER TABLE characters ADD COLUMN IF NOT EXISTS streak_freeze_count INT NOT NULL DEFAULT 1;
+
+-- Cosmetic-only customization: a picked avatar. No gameplay effect.
+-- (The equipped-title column is added further down, after the achievements
+-- table it references exists — see there.)
+ALTER TABLE characters ADD COLUMN IF NOT EXISTS avatar_id VARCHAR(30) NOT NULL DEFAULT 'wolf';
+
 CREATE TABLE IF NOT EXISTS character_stats (
     id            UUID        PRIMARY KEY,
     character_id  UUID        NOT NULL REFERENCES characters (id) ON DELETE CASCADE,
@@ -94,6 +102,15 @@ CREATE TABLE IF NOT EXISTS quests (
 
 -- Add min_level to existing quests tables that were created before this column existed.
 ALTER TABLE quests ADD COLUMN IF NOT EXISTS min_level INT NOT NULL DEFAULT 1;
+
+-- Add the category chip + optional time estimate used by the quest-board filter chips.
+ALTER TABLE quests ADD COLUMN IF NOT EXISTS tag VARCHAR(20);
+ALTER TABLE quests ADD COLUMN IF NOT EXISTS estimated_minutes INT;
+
+-- Add the player-submission approval queue. Existing rows (all admin-authored
+-- so far) default to APPROVED, preserving current behavior.
+ALTER TABLE quests ADD COLUMN IF NOT EXISTS status VARCHAR(20) NOT NULL DEFAULT 'APPROVED';
+ALTER TABLE quests ADD COLUMN IF NOT EXISTS created_by_user_id UUID REFERENCES users (id) ON DELETE SET NULL;
 
 -- Seed quests (idempotent via ON CONFLICT DO NOTHING).
 -- Tier 1 — available from level 1
@@ -171,6 +188,70 @@ VALUES
 
 ON CONFLICT (quest_id) DO NOTHING;
 
+-- One-time backfill of tag/estimated_minutes for the seed quests above, for
+-- installs that already had these rows before the columns existed. Guarded by
+-- "tag IS NULL" so it never overwrites an admin's later edits.
+UPDATE quests SET tag = 'CARDIO',    estimated_minutes = 30  WHERE quest_id = 'Q-1001' AND tag IS NULL;
+UPDATE quests SET tag = 'STRENGTH',  estimated_minutes = 45  WHERE quest_id = 'Q-1002' AND tag IS NULL;
+UPDATE quests SET tag = 'RECOVERY',  estimated_minutes = 30  WHERE quest_id = 'Q-1003' AND tag IS NULL;
+UPDATE quests SET tag = 'RECOVERY',  estimated_minutes = 15  WHERE quest_id = 'Q-1004' AND tag IS NULL;
+UPDATE quests SET tag = 'INTENSE',   estimated_minutes = 20  WHERE quest_id = 'Q-1005' AND tag IS NULL;
+UPDATE quests SET tag = 'CARDIO',    estimated_minutes = 90  WHERE quest_id = 'Q-1006' AND tag IS NULL;
+UPDATE quests SET tag = 'STRENGTH',  estimated_minutes = 50  WHERE quest_id = 'Q-1007' AND tag IS NULL;
+UPDATE quests SET tag = 'INTENSE',   estimated_minutes = 10  WHERE quest_id = 'Q-1008' AND tag IS NULL;
+UPDATE quests SET tag = 'CARDIO',    estimated_minutes = 55  WHERE quest_id = 'Q-2001' AND tag IS NULL;
+UPDATE quests SET tag = 'STRENGTH',  estimated_minutes = 60  WHERE quest_id = 'Q-2002' AND tag IS NULL;
+UPDATE quests SET tag = 'RECOVERY',  estimated_minutes = 60  WHERE quest_id = 'Q-2003' AND tag IS NULL;
+UPDATE quests SET tag = 'RECOVERY',  estimated_minutes = 55  WHERE quest_id = 'Q-2004' AND tag IS NULL;
+UPDATE quests SET tag = 'INTENSE',   estimated_minutes = 35  WHERE quest_id = 'Q-2005' AND tag IS NULL;
+UPDATE quests SET tag = 'CARDIO',    estimated_minutes = 130 WHERE quest_id = 'Q-3001' AND tag IS NULL;
+UPDATE quests SET tag = 'STRENGTH',  estimated_minutes = 75  WHERE quest_id = 'Q-3002' AND tag IS NULL;
+UPDATE quests SET tag = 'INTENSE',   estimated_minutes = 45  WHERE quest_id = 'Q-3003' AND tag IS NULL;
+UPDATE quests SET tag = 'RECOVERY',  estimated_minutes = 60  WHERE quest_id = 'Q-3004' AND tag IS NULL;
+UPDATE quests SET tag = 'CARDIO',    estimated_minutes = 300 WHERE quest_id = 'Q-4001' AND tag IS NULL;
+UPDATE quests SET tag = 'STRENGTH',  estimated_minutes = 120 WHERE quest_id = 'Q-4002' AND tag IS NULL;
+UPDATE quests SET tag = 'INTENSE',   estimated_minutes = 30  WHERE quest_id = 'Q-4003' AND tag IS NULL;
+UPDATE quests SET tag = 'RECOVERY',  estimated_minutes = 90  WHERE quest_id = 'Q-4004' AND tag IS NULL;
+
+CREATE TABLE IF NOT EXISTS achievements (
+    code          VARCHAR(50)  PRIMARY KEY,
+    name          VARCHAR(255) NOT NULL,
+    description   TEXT,
+    icon          VARCHAR(10)  NOT NULL,
+    criteria_type VARCHAR(30)  NOT NULL,
+    threshold     INT          NOT NULL
+);
+
+-- Seed the badge catalog (idempotent via ON CONFLICT DO NOTHING).
+INSERT INTO achievements (code, name, description, icon, criteria_type, threshold)
+VALUES
+    ('FIRST_STEPS',  'First Steps',       'Claim your very first quest.',                          '🥾', 'FIRST_CLAIM',             1),
+    ('LEVEL_10',     'Rising Operative',  'Reach character level 10.',                              '⭐', 'LEVEL_MILESTONE',         10),
+    ('LEVEL_25',     'Veteran Operative', 'Reach character level 25.',                              '🌟', 'LEVEL_MILESTONE',         25),
+    ('LEVEL_50',     'Iron Legend',       'Reach character level 50.',                              '👑', 'LEVEL_MILESTONE',         50),
+    ('STREAK_7',     'One Week Strong',   'Reach a 7-day training streak.',                         '🔥', 'STREAK_MILESTONE',        7),
+    ('STREAK_30',    'Unbreakable',       'Reach a 30-day training streak.',                        '🌋', 'STREAK_MILESTONE',        30),
+    ('CLAIMS_50',    'Grinder',           'Claim 50 quests over your lifetime.',                    '⚔️', 'TOTAL_CLAIMS_MILESTONE',  50),
+    ('CLAIMS_200',   'Relentless',        'Claim 200 quests over your lifetime.',                   '🗡️', 'TOTAL_CLAIMS_MILESTONE',  200),
+    ('BALANCED_10',  'Well Rounded',      'Bring all four attributes to level 10 simultaneously.',  '🧭', 'ALL_STATS_LEVEL',         10)
+ON CONFLICT (code) DO NOTHING;
+
+CREATE TABLE IF NOT EXISTS character_achievements (
+    id               UUID        PRIMARY KEY,
+    character_id     UUID        NOT NULL REFERENCES characters (id) ON DELETE CASCADE,
+    achievement_code VARCHAR(50) NOT NULL REFERENCES achievements (code) ON DELETE CASCADE,
+    unlocked_at      TIMESTAMP   NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT uq_character_achievement UNIQUE (character_id, achievement_code)
+);
+
+CREATE INDEX IF NOT EXISTS idx_character_achievements_character_id ON character_achievements (character_id);
+
+-- Cosmetic-only equipped title, drawn from the character's own unlocked
+-- achievements (enforced in application code, not a DB constraint, since a
+-- character can equip at most the achievements *they* hold). Added here,
+-- after the achievements table it references.
+ALTER TABLE characters ADD COLUMN IF NOT EXISTS title_achievement_code VARCHAR(50) REFERENCES achievements (code) ON DELETE SET NULL;
+
 CREATE TABLE IF NOT EXISTS friendships (
     id                   UUID        PRIMARY KEY,
     requester_id         UUID        NOT NULL REFERENCES users (id) ON DELETE CASCADE,
@@ -194,6 +275,37 @@ CREATE TABLE IF NOT EXISTS revoked_tokens (
     jti        VARCHAR(36) PRIMARY KEY,
     expires_at TIMESTAMP   NOT NULL
 );
+
+-- Time-boxed seasonal XP multipliers, checked at claim time the same way
+-- MidnightDecayService checks inactivity — no scheduler flips these on/off.
+CREATE TABLE IF NOT EXISTS game_events (
+    id               UUID          PRIMARY KEY,
+    name             VARCHAR(255)  NOT NULL,
+    start_at         TIMESTAMP     NOT NULL,
+    end_at           TIMESTAMP     NOT NULL,
+    xp_multiplier    NUMERIC(5, 2) NOT NULL,
+    applies_to_stat  VARCHAR(3)
+);
+
+CREATE INDEX IF NOT EXISTS idx_game_events_window ON game_events (start_at, end_at);
+
+-- Raw audit trail of every activity-sync submission (wearable-integration
+-- groundwork — no OAuth/device wiring yet, "source" is free text). The
+-- unique constraint is what prevents double-crediting XP for the same
+-- character/source/day; see ActivitySyncService.
+CREATE TABLE IF NOT EXISTS activity_sync_records (
+    id             UUID        PRIMARY KEY,
+    character_id   UUID        NOT NULL REFERENCES characters (id) ON DELETE CASCADE,
+    source         VARCHAR(50) NOT NULL,
+    activity_date  DATE        NOT NULL,
+    steps          INT         NOT NULL DEFAULT 0,
+    active_minutes INT         NOT NULL DEFAULT 0,
+    xp_awarded     INT         NOT NULL DEFAULT 0,
+    synced_at      TIMESTAMP   NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT uq_activity_sync_record UNIQUE (character_id, source, activity_date)
+);
+
+CREATE INDEX IF NOT EXISTS idx_activity_sync_records_character_id ON activity_sync_records (character_id);
 
 -- Helpful secondary indexes for FK lookups.
 CREATE INDEX IF NOT EXISTS idx_character_stats_character_id ON character_stats (character_id);

@@ -58,7 +58,7 @@ public class AuthService {
 
     @Transactional(readOnly = true)
     public AuthResponse login(String username, String password) {
-        User user = userRepository.findByUsername(username)
+        User user = userRepository.findByUsernameIgnoreCase(username)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Invalid username or password"));
         if (!passwordEncoder.matches(password, user.getPasswordHash())) {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Invalid username or password");
@@ -82,7 +82,7 @@ public class AuthService {
      */
     @Transactional(readOnly = true)
     public String getSecurityQuestion(String username) {
-        User user = userRepository.findByUsername(username)
+        User user = userRepository.findByUsernameIgnoreCase(username)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
                         "No recovery question configured for this account"));
         if (user.getSecurityQuestion() == null) {
@@ -99,7 +99,7 @@ public class AuthService {
      */
     @Transactional
     public AuthResponse resetPassword(String username, String securityAnswer, String newPassword) {
-        User user = userRepository.findByUsername(username)
+        User user = userRepository.findByUsernameIgnoreCase(username)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Incorrect answer"));
         if (user.getSecurityAnswerHash() == null
                 || !passwordEncoder.matches(normalizeAnswer(securityAnswer), user.getSecurityAnswerHash())) {

@@ -6,28 +6,39 @@ import com.litrpg.fitness.exception.ResourceNotFoundException;
 import com.litrpg.fitness.model.Character;
 import com.litrpg.fitness.model.CharacterStat;
 import com.litrpg.fitness.model.StatType;
+import com.litrpg.fitness.repository.CharacterAchievementRepository;
 import com.litrpg.fitness.repository.CharacterRepository;
 import com.litrpg.fitness.repository.WorkoutLogRepository;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
 /**
  * Character lifecycle operations that are not part of the core game loop:
- * creation (with seeded stats) and retrieval.
+ * creation (with seeded stats), retrieval, and cosmetic customization.
  */
 @Service
 public class CharacterService {
 
+    /** Starter avatar catalog — cosmetic only, referenced by id from the frontend's picker. */
+    public static final Set<String> AVATAR_CATALOG = Set.of(
+            "wolf", "phoenix", "serpent", "golem", "raven", "tiger", "owl", "stag", "fox", "bear", "hawk", "turtle");
+
     private final CharacterRepository characterRepository;
     private final WorkoutLogRepository workoutLogRepository;
+    private final CharacterAchievementRepository characterAchievementRepository;
 
-    public CharacterService(CharacterRepository characterRepository, WorkoutLogRepository workoutLogRepository) {
+    public CharacterService(CharacterRepository characterRepository, WorkoutLogRepository workoutLogRepository,
+                             CharacterAchievementRepository characterAchievementRepository) {
         this.characterRepository = characterRepository;
         this.workoutLogRepository = workoutLogRepository;
+        this.characterAchievementRepository = characterAchievementRepository;
     }
 
     /**
@@ -108,6 +119,33 @@ public class CharacterService {
     public void deleteOwnedCharacter(UUID id, UUID userId) {
         Character character = getOwnedCharacter(id, userId);
         characterRepository.delete(character);
+    }
+
+    /**
+     * Sets a character's cosmetic avatar and equipped title. {@code avatarId}
+     * must be one of the starter catalog; {@code titleAchievementCode} must be
+     * either blank/null (unequip) or the code of an achievement this specific
+     * character has already unlocked — neither has any gameplay effect.
+     */
+    @Transactional
+    public Character updateCustomization(UUID id, UUID userId, String avatarId, String titleAchievementCode) {
+        Character character = getOwnedCharacter(id, userId);
+
+        if (!AVATAR_CATALOG.contains(avatarId)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Unknown avatarId: " + avatarId);
+        }
+        character.setAvatarId(avatarId);
+
+        String normalizedTitle = (titleAchievementCode == null || titleAchievementCode.isBlank())
+                ? null : titleAchievementCode.trim();
+        if (normalizedTitle != null
+                && !characterAchievementRepository.existsByCharacterIdAndAchievementCode(id, normalizedTitle)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Achievement not unlocked by this character: " + normalizedTitle);
+        }
+        character.setTitleAchievementCode(normalizedTitle);
+
+        return characterRepository.save(character);
     }
 
     /**

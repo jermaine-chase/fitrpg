@@ -9,12 +9,12 @@ import jakarta.validation.constraints.Positive;
 import jakarta.validation.constraints.PositiveOrZero;
 
 /**
- * Request body for admin quest create and update operations.
- * {@code questId} is required for create; ignored for update (taken from path).
+ * Request body for {@code POST /api/quests/submit} — a player-authored quest
+ * idea. Always created {@code PENDING}; an admin must approve it (see
+ * {@code POST /api/admin/quests/{id}/approve}) before it appears in the
+ * public catalog or can be claimed.
  */
-public class QuestFormRequest {
-
-    private String questId;
+public class QuestSubmissionRequest {
 
     @NotBlank
     private String title;
@@ -24,11 +24,12 @@ public class QuestFormRequest {
     @NotNull
     private StatType targetStat;
 
+    /** Defaults to a modest reward; admins can adjust via the quest edit form before or after approving. */
     @PositiveOrZero
-    private int baseCharacterXp;
+    private int baseCharacterXp = 50;
 
     @PositiveOrZero
-    private int baseStatXp;
+    private int baseStatXp = 50;
 
     @Min(1)
     private int minLevel = 1;
@@ -37,14 +38,6 @@ public class QuestFormRequest {
 
     @Positive
     private Integer estimatedMinutes;
-
-    public String getQuestId() {
-        return questId;
-    }
-
-    public void setQuestId(String questId) {
-        this.questId = questId;
-    }
 
     public String getTitle() {
         return title;
