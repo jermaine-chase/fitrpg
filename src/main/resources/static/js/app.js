@@ -5,10 +5,35 @@ const LS = {
   token:   'ironpath_token',
   charId:  'ironpath_char_id',
   isAdmin: 'ironpath_is_admin',
+  apiBase: 'ironpath_api_base',
   log:     id => `ironpath_log_${id}`,
   done:    id => `ironpath_done_${id}`,
 };
-const API_BASE = 'http://localhost:8080';
+
+/*
+ * Same-origin by default (Spring serves this page itself), so the app works
+ * out of the box wherever it's deployed. If the frontend is ever hosted
+ * separately from the API, repoint it via a `?api=https://host` query param
+ * (persisted to localStorage on first use) or the API field in the Account
+ * overlay.
+ */
+function resolveApiBase() {
+  const fromQuery = new URLSearchParams(window.location.search).get('api');
+  if (fromQuery !== null) {
+    const trimmed = fromQuery.trim().replace(/\/+$/, '');
+    if (trimmed) localStorage.setItem(LS.apiBase, trimmed);
+    else localStorage.removeItem(LS.apiBase);
+    return trimmed;
+  }
+  return (localStorage.getItem(LS.apiBase) || '').replace(/\/+$/, '');
+}
+let API_BASE = resolveApiBase();
+function setApiBase(value) {
+  const trimmed = (value || '').trim().replace(/\/+$/, '');
+  if (trimmed) localStorage.setItem(LS.apiBase, trimmed);
+  else localStorage.removeItem(LS.apiBase);
+  API_BASE = trimmed;
+}
 const STAT_ORDER  = ['STR', 'DEX', 'CON', 'WIL'];
 const STAT_NAME   = { STR: 'Strength', DEX: 'Dexterity', CON: 'Constitution', WIL: 'Willpower' };
 
@@ -356,7 +381,8 @@ function renderLog() {
 function setConn(ok) {
   const dot = $('#connDot'), txt = $('#connText');
   dot.className = 'dot ' + (ok ? 'ok' : 'bad');
-  txt.textContent = ok ? 'linked · ' + apiBase().replace(/^https?:\/\//, '') : 'offline';
+  const label = apiBase() ? apiBase().replace(/^https?:\/\//, '') : 'same origin';
+  txt.textContent = ok ? 'linked · ' + label : 'offline';
 }
 function showBanner(msg) { const b = $('#banner'); b.innerHTML = msg; b.classList.add('show'); }
 function hideBanner()    { $('#banner').classList.remove('show'); }
@@ -471,8 +497,9 @@ function handleError(e, action) {
   const isNetwork = e instanceof TypeError;
   setConn(false);
   if (isNetwork) {
-    showBanner(`<b>Connection severed.</b> Could not reach the API at <b>${esc(apiBase())}</b>. Make sure the Spring Boot app is running, then reload the page.`);
-    pushLog('error', `Connection severed while trying to ${esc(action)} — API unreachable at ${esc(apiBase())}`);
+    const label = apiBase() || 'same origin';
+    showBanner(`<b>Connection severed.</b> Could not reach the API at <b>${esc(label)}</b>. Make sure the Spring Boot app is running, then reload the page.`);
+    pushLog('error', `Connection severed while trying to ${esc(action)} — API unreachable at ${esc(label)}`);
   } else {
     showBanner(`<b>Request failed.</b> ${esc(e.message)} (while trying to ${esc(action)}).`);
     pushLog('error', `Failed to ${esc(action)}: ${esc(e.message)}`);
@@ -642,7 +669,7 @@ async function submitOverlay() {
   } catch (e) {
     const isNetwork = e instanceof TypeError;
     $('#ovErr').textContent = isNetwork
-      ? `Cannot reach the API at ${apiBase()}. Is the server running?`
+      ? `Cannot reach the API at ${apiBase() || 'same origin'}. Is the server running?`
       : (e.status === 409 ? 'That username is already taken.'
         : e.status === 401 ? (overlayMode === 'forgot2' ? 'Incorrect answer.' : 'Invalid username or password.')
         : e.status === 404 ? 'No recovery question found for that username.'
@@ -659,6 +686,7 @@ async function openAccountOverlay() {
   $('#acctCurrentPassword').value = '';
   $('#acctQuestion').value = '';
   $('#acctAnswer').value = '';
+  $('#acctApiBase').value = API_BASE;
   $('#accountOverlay').classList.add('show');
   try {
     const res = await API.getSecurityQuestion();
@@ -689,6 +717,13 @@ async function submitAccountOverlay() {
   } finally {
     btn.disabled = false;
   }
+}
+
+function saveApiBaseFromAccount() {
+  setApiBase($('#acctApiBase').value);
+  $('#acctApiBase').value = API_BASE;
+  setConn(true);
+  pushLog('system', `SYSTEM: API base updated to <span class="hl">${esc(API_BASE || 'same origin')}</span>. Reload to reconnect.`);
 }
 
 /* ========================== friends ======================================== */
@@ -940,6 +975,7 @@ async function boot() {
   $('#accountCloseBtn').addEventListener('click', closeAccountOverlay);
   $('#accountOverlay').addEventListener('click', e => { if (e.target.id === 'accountOverlay') closeAccountOverlay(); });
   $('#acctSubmit').addEventListener('click', submitAccountOverlay);
+  $('#acctApiBaseSave').addEventListener('click', saveApiBaseFromAccount);
   $('#friendsCloseBtn').addEventListener('click', closeFriends);
   $('#friendsOverlay').addEventListener('click', e => { if (e.target.id === 'friendsOverlay') closeFriends(); });
   $('#friendDetailBack').addEventListener('click', () => switchFriendsTab('list'));

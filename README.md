@@ -178,9 +178,13 @@ served by Spring Boot itself at the app's root:
   screen instead. The topbar "⚙ Admin" link on `index.html` itself is only
   shown to admin accounts. See [Auth, roles & account recovery](#auth-roles--account-recovery).
 
-Both pages talk to a **hardcoded** `http://localhost:8080` — there is no UI
-to repoint them at another instance. If you deploy the API elsewhere, either
-edit `API_BASE` in each file's `<script>` or serve them from that same origin.
+Both pages default to **same-origin** relative API calls, since Spring serves
+them itself. If you host the frontend separately from the API, repoint it
+without editing any files: pass `?api=https://your-api-host` once (the value
+is cached in `localStorage` under `ironpath_api_base` and reused on later
+visits) or set it directly — `index.html` has an "API Base URL" field in the
+Account overlay, `admin.html` has one in its topbar. Clearing the field (or
+passing `?api=`) reverts to same-origin.
 
 CORS is handled by `WebConfig` (`app.cors.allowed-origins`, default `*`).
 Tighten it in production via the `APP_CORS_ALLOWED_ORIGINS` env var.

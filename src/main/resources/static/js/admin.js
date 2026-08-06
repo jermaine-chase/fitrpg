@@ -1,9 +1,31 @@
 "use strict";
 
-const API_BASE = 'http://localhost:8080';
-const LS = { token: 'ironpath_token', charId: 'ironpath_char_id', isAdmin: 'ironpath_is_admin' };
+const LS = {
+  token: 'ironpath_token', charId: 'ironpath_char_id', isAdmin: 'ironpath_is_admin',
+  apiBase: 'ironpath_api_base',
+};
 const $ = sel => document.querySelector(sel);
 const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+/* Same-origin by default; override via `?api=` (persisted) or the topbar field —
+ * shares the ironpath_api_base localStorage key with index.html. */
+function resolveApiBase() {
+  const fromQuery = new URLSearchParams(window.location.search).get('api');
+  if (fromQuery !== null) {
+    const trimmed = fromQuery.trim().replace(/\/+$/, '');
+    if (trimmed) localStorage.setItem(LS.apiBase, trimmed);
+    else localStorage.removeItem(LS.apiBase);
+    return trimmed;
+  }
+  return (localStorage.getItem(LS.apiBase) || '').replace(/\/+$/, '');
+}
+let API_BASE = resolveApiBase();
+function setApiBase(value) {
+  const trimmed = (value || '').trim().replace(/\/+$/, '');
+  if (trimmed) localStorage.setItem(LS.apiBase, trimmed);
+  else localStorage.removeItem(LS.apiBase);
+  API_BASE = trimmed;
+}
 const apiBase = () => API_BASE;
 
 /* ========================== auth ==========================================
@@ -271,6 +293,13 @@ function closeCharModal() { $('#charOverlay').classList.remove('show'); }
 /* ========================== boot ========================================== */
 async function boot() {
   $('#logoutBtn').addEventListener('click', logout);
+  $('#apiBaseInput').value = API_BASE;
+  $('#apiBaseSaveBtn').addEventListener('click', () => {
+    setApiBase($('#apiBaseInput').value);
+    $('#apiBaseInput').value = API_BASE;
+    flash(`API base set to ${API_BASE || 'same origin'} — reloading…`);
+    setTimeout(() => window.location.reload(), 600);
+  });
 
   /* quest modal wiring */
   $('#addQuestBtn').addEventListener('click',   () => openQuestModal('create'));
