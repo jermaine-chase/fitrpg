@@ -171,6 +171,11 @@ served by Spring Boot itself at the app's root:
   and an "Allies" overlay for friend requests, per-friend visibility, and the
   Guild Hall activity feed. All game state (XP, levels, streak, stats) is
   owned by the server; the JWT and character id are cached in `localStorage`.
+  Claiming a quest animates the XP bars (CSS width transitions) and plays a
+  short synthesized cue via the Web Audio API — a distinct ascending chime
+  plus a golden HUD flash on level-up, a separate sparkle cue and violet
+  flash when the 15% bonus-challenge roll fires — with no audio assets or
+  build tooling involved.
 - **`admin.html`** — the admin console for managing the quest catalog and
   character roster directly. It reuses the same player JWT `index.html`
   stores in `localStorage` (there's no separate admin login); if the signed-in

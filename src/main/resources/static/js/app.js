@@ -55,8 +55,53 @@ const todayStr        = () => { const d = new Date(); return `${d.getFullYear()}
 
 /* ========================== state ========================================= */
 let state = { char: null, history: [], daily: null, dailyBonusMultiplier: 1 };
-let ui    = { activeQuestId: null, checked: false, busy: false };
+let ui    = { activeQuestId: null, checked: false, busy: false, pendingLevelUp: false };
 let quests = [];
+let prevStatPct = {};
+
+/* ========================== audio cues (Web Audio API, no assets) ========== */
+let audioCtx = null;
+function getAudioCtx() {
+  const AC = window.AudioContext || window.webkitAudioContext;
+  if (!AC) return null;
+  if (!audioCtx) audioCtx = new AC();
+  if (audioCtx.state === 'suspended') audioCtx.resume().catch(() => {});
+  return audioCtx;
+}
+function playTone(freq, startOffset, duration, type, gainPeak) {
+  const ctx = getAudioCtx(); if (!ctx) return;
+  const osc = ctx.createOscillator();
+  const gain = ctx.createGain();
+  osc.type = type || 'sine';
+  osc.frequency.value = freq;
+  const t0 = ctx.currentTime + startOffset;
+  gain.gain.setValueAtTime(0.0001, t0);
+  gain.gain.linearRampToValueAtTime(gainPeak, t0 + 0.02);
+  gain.gain.exponentialRampToValueAtTime(0.0001, t0 + duration);
+  osc.connect(gain).connect(ctx.destination);
+  osc.start(t0);
+  osc.stop(t0 + duration + 0.05);
+}
+function playXpGainCue()   { playTone(660, 0, 0.09, 'sine', 0.05); }
+function playLevelUpCue()  { [523.25, 659.25, 783.99, 1046.5].forEach((f, i) => playTone(f, i * 0.09, 0.28, 'triangle', 0.16)); }
+function playBonusCue()    { playTone(987.77, 0, 0.12, 'sine', 0.11); playTone(1318.51, 0.08, 0.2, 'sine', 0.11); }
+
+/* ========================== visual feedback cues =========================== */
+function flashPanel(kind) {
+  const el = $('#hudPanel'); if (!el) return;
+  const cls = 'flash-' + kind;
+  el.classList.remove(cls);
+  void el.offsetWidth; // force reflow so the animation restarts if retriggered quickly
+  el.classList.add(cls);
+  setTimeout(() => el.classList.remove(cls), 1200);
+}
+function pulseLevelBadge() {
+  const el = $('#lvBadge'); if (!el) return;
+  el.classList.remove('pulse');
+  void el.offsetWidth;
+  el.classList.add('pulse');
+  setTimeout(() => el.classList.remove('pulse'), 800);
+}
 
 /* ========================== API layer ===================================== */
 async function apiFetch(path, options = {}) {
@@ -258,7 +303,26 @@ function renderHud() {
   $('#charLevel').textContent = c.currentLevel;
   $('#charXp').textContent    = c.overallXp;
   $('#charXpMax').textContent = c.xpForNextLevel;
-  $('#charXpFill').style.width = pct(c.overallXp, c.xpForNextLevel) + '%';
+
+  const fill = $('#charXpFill');
+  const targetPct = pct(c.overallXp, c.xpForNextLevel);
+  if (ui.pendingLevelUp) {
+    // Fill to 100% (old level), snap back to empty, then animate up to the
+    // carried-over XP so a level-up reads as "topped off, then restarted".
+    ui.pendingLevelUp = false;
+    fill.style.transition = 'none';
+    fill.style.width = '100%';
+    requestAnimationFrame(() => {
+      fill.style.transition = 'none';
+      fill.style.width = '0%';
+      requestAnimationFrame(() => {
+        fill.style.transition = '';
+        fill.style.width = targetPct + '%';
+      });
+    });
+  } else {
+    fill.style.width = targetPct + '%';
+  }
   $('#streakDay').textContent = c.streakCount;
   $('#buffVal').textContent   = multiplierFor(c.streakCount).toFixed(2);
 
@@ -277,6 +341,11 @@ function renderStats() {
     const s = byType[type]; if (!s) return '';
     const rusty = (s.status || '').toLowerCase() === 'rusty';
     const lc = type.toLowerCase();
+    const target = pct(s.currentXp, s.xpForNextLevel);
+    // Rebuilt from scratch each render, so start the bar at its previous width
+    // (if known) and animate to the target on the next frame — otherwise the
+    // CSS width transition has no "before" state to animate from.
+    const start = prevStatPct[type] != null ? prevStatPct[type] : target;
     return `
       <div class="stat">
         <div class="stat__head">
@@ -285,10 +354,22 @@ function renderStats() {
           <span class="stat__lv">LV ${s.currentLevel}</span>
           <span class="stat__status ${rusty ? 'is-rusty' : 'is-active'}">${rusty ? 'Rusty' : 'Active'}</span>
         </div>
-        <div class="bar stat__bar"><div class="bar__fill fill-${lc}" style="width:${pct(s.currentXp, s.xpForNextLevel)}%"></div></div>
+        <div class="bar stat__bar"><div class="bar__fill fill-${lc}" data-target="${target}" style="width:${start}%"></div></div>
         <div class="stat__xp">${s.currentXp} / ${s.xpForNextLevel} XP</div>
       </div>`;
   }).join('');
+
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => {
+      $('#statList').querySelectorAll('.bar__fill[data-target]').forEach(el => {
+        el.style.width = el.dataset.target + '%';
+      });
+    });
+  });
+  STAT_ORDER.forEach(type => {
+    const s = byType[type];
+    if (s) prevStatPct[type] = pct(s.currentXp, s.xpForNextLevel);
+  });
 }
 
 function renderQuestBoard() {
@@ -400,8 +481,15 @@ async function claimQuest(questId) {
     markDone(state.char.id, questId);
     logClaimOutcome(questId, prev, result);
 
+    const leveledUp = result.character.currentLevel > prev.currentLevel;
+    const bonusRolled = !!result.bonusChallenge;
+    ui.pendingLevelUp = leveledUp;
+    if (leveledUp) { playLevelUpCue(); flashPanel('levelup'); pulseLevelBadge(); }
+    else playXpGainCue();
+    if (bonusRolled) { playBonusCue(); flashPanel('bonus'); }
+
     // re-fetch quests if the character leveled up (new tiers may unlock)
-    if (result.character.currentLevel > prev.currentLevel) {
+    if (leveledUp) {
       await loadQuests(result.character.currentLevel);
     }
 
@@ -961,6 +1049,12 @@ async function handleFriendsChange(e) {
 
 /* ========================== boot ========================================== */
 async function boot() {
+  // Browsers require a user gesture before audio can play; unlock the
+  // AudioContext on the very first click anywhere so later async cues
+  // (which fire after an awaited API call, outside the original gesture)
+  // aren't silently blocked.
+  document.addEventListener('click', () => getAudioCtx(), { once: true });
+
   $('#abandonBtn').addEventListener('click', abandonRun);
   $('#logoutBtn').addEventListener('click', logoutUser);
   $('#ovSubmit').addEventListener('click',   submitOverlay);
