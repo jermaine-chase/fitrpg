@@ -1,6 +1,8 @@
 package com.litrpg.fitness.service;
 
 import com.litrpg.fitness.dto.AchievementUnlockDTO;
+import com.litrpg.fitness.dto.ActivityRewardDTO;
+import com.litrpg.fitness.dto.ActivitySyncResponse;
 import com.litrpg.fitness.dto.BonusChallengeDTO;
 import com.litrpg.fitness.dto.ClaimRewardResponse;
 import com.litrpg.fitness.dto.CharacterSheetResponse;
@@ -28,6 +30,8 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.temporal.ChronoUnit;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -233,6 +237,95 @@ public class GameEngineService {
 
         return new ClaimRewardResponse(CharacterSheetResponse.from(saved), bonusChallenge, dailyFocusBonusXp,
                 newAchievements);
+    }
+
+    /**
+     * Converts synced activity (already thresholded into base XP amounts per
+     * stat by {@code ActivitySyncService}) into character progress through
+     * this same reward pipeline: level scale, the streak multiplier (updating
+     * the streak exactly once for the whole batch — not once per stat — the
+     * same as a single quest claim would), any active seasonal event
+     * multiplier per stat, and an independent bonus-challenge roll per stat.
+     * There is no Daily Focus bonus here — that's tied to claiming a
+     * specific quest id, which activity sync has none of.
+     *
+     * @param baseXpByStat base XP to award per stat; entries with a
+     *                     non-positive amount are skipped entirely (no streak
+     *                     update, no log row) — callers should omit stats
+     *                     that didn't cross their threshold rather than pass 0
+     * @param sourceLabel  free-text source, recorded on the workout log for context
+     */
+    @Transactional
+    public ActivitySyncResponse applyActivitySyncRewards(UUID characterId, Map<StatType, Integer> baseXpByStat,
+                                                          String sourceLabel) {
+        Character character = characterRepository.findById(characterId)
+                .orElseThrow(() -> new ResourceNotFoundException("Character not found: " + characterId));
+
+        Map<StatType, Integer> positiveAmounts = new LinkedHashMap<>();
+        baseXpByStat.forEach((stat, xp) -> { if (xp != null && xp > 0) positiveAmounts.put(stat, xp); });
+
+        List<ActivityRewardDTO> rewards = new ArrayList<>();
+        if (positiveAmounts.isEmpty()) {
+            return new ActivitySyncResponse(CharacterSheetResponse.from(character), rewards, List.of());
+        }
+
+        LocalDate today = LocalDate.now();
+        double levelScale = GameFormulas.questXpScale(character.getCurrentLevel());
+
+        int existingStreak = character.getStreakCount();
+        double streakMultiplier = 1.0 + Math.min(existingStreak * STREAK_BONUS_PER_DAY, MAX_STREAK_BONUS);
+        int updatedStreak = computeNewStreak(character, today);
+        character.setStreakCount(updatedStreak);
+        character.setLastWorkoutDate(today);
+
+        for (Map.Entry<StatType, Integer> entry : positiveAmounts.entrySet()) {
+            StatType stat = entry.getKey();
+            int scaledXp = (int) Math.round(entry.getValue() * levelScale);
+            int xp = (int) Math.round(scaledXp * streakMultiplier);
+
+            double eventMultiplier = gameEventService.getActiveMultiplier(stat);
+            if (eventMultiplier != 1.0) {
+                xp = (int) Math.round(xp * eventMultiplier);
+            }
+
+            BonusChallengeDTO bonusChallenge = null;
+            if (ThreadLocalRandom.current().nextDouble() < BONUS_CHALLENGE_CHANCE) {
+                List<String> prompts = BONUS_PROMPTS.get(stat);
+                String prompt = prompts.get(ThreadLocalRandom.current().nextInt(prompts.size()));
+                int preBonus = xp;
+                xp = (int) Math.round(xp * BONUS_CHALLENGE_MULTIPLIER);
+                bonusChallenge = new BonusChallengeDTO(prompt, xp - preBonus);
+            }
+
+            applyCharacterXp(character, xp);
+            CharacterStat characterStat = character.getStats().stream()
+                    .filter(s -> s.getStatType() == stat)
+                    .findFirst()
+                    .orElseThrow(() -> new ResourceNotFoundException(
+                            "Stat " + stat + " not found for character " + characterId));
+            applyStatXp(characterStat, xp);
+
+            WorkoutLog logEntry = new WorkoutLog();
+            logEntry.setQuestId(null);
+            logEntry.setQuestTitle("Activity Sync (" + sourceLabel + ")");
+            logEntry.setStatType(stat);
+            logEntry.setBaseXpEarned(scaledXp);
+            logEntry.setMultiplierApplied(BigDecimal.valueOf(streakMultiplier * eventMultiplier).setScale(2, RoundingMode.HALF_UP));
+            logEntry.setFinalXpAwarded(xp);
+            logEntry.setLoggedAt(LocalDateTime.now());
+            character.addWorkoutLog(logEntry);
+
+            rewards.add(new ActivityRewardDTO(stat, xp, bonusChallenge));
+        }
+
+        Character saved = characterRepository.save(character);
+        log.info("Character {} synced activity from '{}': {} stat(s) rewarded, streak now {}.",
+                characterId, sourceLabel, rewards.size(), updatedStreak);
+
+        List<Achievement> unlocked = achievementService.evaluateUnlocks(saved);
+        List<AchievementUnlockDTO> newAchievements = unlocked.stream().map(AchievementUnlockDTO::from).toList();
+
+        return new ActivitySyncResponse(CharacterSheetResponse.from(saved), rewards, newAchievements);
     }
 
     /**

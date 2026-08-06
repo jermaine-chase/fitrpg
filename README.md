@@ -24,11 +24,12 @@ com.litrpg.fitness
 ├── model        User, Character, CharacterStat, WorkoutLog, Quest, QuestTag, StatType,
 │                DailyQuestAssignment, Friendship, FriendshipStatus, FriendVisibility,
 │                RevokedToken, Achievement, AchievementCriteriaType, CharacterAchievement,
-│                LeaderboardScope, LeaderboardMetric, QuestStatus, GameEvent
+│                LeaderboardScope, LeaderboardMetric, QuestStatus, GameEvent,
+│                ActivitySyncRecord
 ├── repository   JpaRepository interfaces
 ├── service      AuthService, GameEngineService, CharacterService, DailyQuestService,
 │                FriendService, MidnightDecayService, GameFormulas, AchievementService,
-│                LeaderboardService, QuestService, GameEventService
+│                LeaderboardService, QuestService, GameEventService, ActivitySyncService
 ├── dto          Auth/Character/Quest/Friend/DailyQuest request & response DTOs
 ├── controller   AuthController, CharacterController, QuestController,
 │                FriendController, AdminController, LeaderboardController,
@@ -57,6 +58,9 @@ com.litrpg.fitness
   with per-friendship visibility overrides.
 - **Achievement / CharacterAchievement** — a badge catalog and each
   character's unlocked subset, evaluated inline at claim time.
+- **GameEvent** — a time-boxed seasonal XP multiplier, checked at claim time.
+- **ActivitySyncRecord** — an immutable audit trail of synced wearable
+  activity (wearable-integration groundwork; no OAuth wiring yet).
 
 ## Game rules
 
@@ -155,6 +159,35 @@ visibility level also gates the **activity feed**
 (`GET /api/friends/feed`), which surfaces friends' recent quest claims —
 `NONE` friends are omitted entirely, `BASIC` shows only that a claim
 happened, `FULL` shows the quest, stat, and XP earned.
+
+## Activity sync (wearable-integration groundwork)
+
+`POST /api/character/{id}/activity-sync` `{source, steps, activeMinutes, date}`
+(auth required, ownership-checked like every other character endpoint) is
+backend groundwork for future wearable integration — **there is no
+OAuth/device wiring yet**; `source` is a free-text label ("manual", "fitbit",
+"google_fit", "health_connect", ...) and every caller self-reports for now.
+Wiring a real Fitbit/Google Fit/Health Connect OAuth flow is a documented
+follow-up, not part of this endpoint.
+
+Steps above `app.activity-sync.step-threshold` (default 5000, one XP unit
+per `app.activity-sync.steps-per-xp-unit`, default 1000) convert to CON XP;
+active minutes above `app.activity-sync.minutes-threshold` (default 20, one
+unit per `app.activity-sync.minutes-per-xp-unit`, default 10) convert to STR
+XP, each unit worth `app.activity-sync.xp-per-unit` (default 15) base XP —
+all overridable via `ACTIVITY_SYNC_*` env vars. That base XP is routed
+through `GameEngineService`'s normal reward pipeline (same level scaling,
+streak multiplier — updated once per sync, not once per stat — and any
+active seasonal event multiplier, plus an independent bonus-challenge roll
+per stat) so it behaves like any other source of XP; there's no Daily Focus
+bonus here since that's tied to a specific quest id. `date` defaults to
+today if omitted.
+
+Every submission is stored as an immutable `ActivitySyncRecord` for
+audit/debugging regardless of whether it crossed a threshold. A unique
+constraint on `(character_id, source, activity_date)` guards against
+double-crediting the same day's data from the same source twice — a repeat
+call for a day already synced from that source returns 409.
 
 ## Timed events / seasonal XP multipliers
 

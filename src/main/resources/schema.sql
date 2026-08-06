@@ -289,6 +289,24 @@ CREATE TABLE IF NOT EXISTS game_events (
 
 CREATE INDEX IF NOT EXISTS idx_game_events_window ON game_events (start_at, end_at);
 
+-- Raw audit trail of every activity-sync submission (wearable-integration
+-- groundwork — no OAuth/device wiring yet, "source" is free text). The
+-- unique constraint is what prevents double-crediting XP for the same
+-- character/source/day; see ActivitySyncService.
+CREATE TABLE IF NOT EXISTS activity_sync_records (
+    id             UUID        PRIMARY KEY,
+    character_id   UUID        NOT NULL REFERENCES characters (id) ON DELETE CASCADE,
+    source         VARCHAR(50) NOT NULL,
+    activity_date  DATE        NOT NULL,
+    steps          INT         NOT NULL DEFAULT 0,
+    active_minutes INT         NOT NULL DEFAULT 0,
+    xp_awarded     INT         NOT NULL DEFAULT 0,
+    synced_at      TIMESTAMP   NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT uq_activity_sync_record UNIQUE (character_id, source, activity_date)
+);
+
+CREATE INDEX IF NOT EXISTS idx_activity_sync_records_character_id ON activity_sync_records (character_id);
+
 -- Helpful secondary indexes for FK lookups.
 CREATE INDEX IF NOT EXISTS idx_character_stats_character_id ON character_stats (character_id);
 CREATE INDEX IF NOT EXISTS idx_workout_logs_character_id    ON workout_logs (character_id);

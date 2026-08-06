@@ -1,6 +1,8 @@
 package com.litrpg.fitness.controller;
 
 import com.litrpg.fitness.dto.AchievementResponse;
+import com.litrpg.fitness.dto.ActivitySyncRequest;
+import com.litrpg.fitness.dto.ActivitySyncResponse;
 import com.litrpg.fitness.dto.CharacterCustomizationRequest;
 import com.litrpg.fitness.dto.CharacterSheetResponse;
 import com.litrpg.fitness.dto.ClaimQuestRequest;
@@ -11,6 +13,7 @@ import com.litrpg.fitness.dto.WorkoutLogEntryResponse;
 import com.litrpg.fitness.model.Character;
 import com.litrpg.fitness.security.UserPrincipal;
 import com.litrpg.fitness.service.AchievementService;
+import com.litrpg.fitness.service.ActivitySyncService;
 import com.litrpg.fitness.service.CharacterService;
 import com.litrpg.fitness.service.DailyQuestService;
 import com.litrpg.fitness.service.GameEngineService;
@@ -43,15 +46,18 @@ public class CharacterController {
     private final GameEngineService gameEngineService;
     private final DailyQuestService dailyQuestService;
     private final AchievementService achievementService;
+    private final ActivitySyncService activitySyncService;
 
     public CharacterController(CharacterService characterService,
                                GameEngineService gameEngineService,
                                DailyQuestService dailyQuestService,
-                               AchievementService achievementService) {
+                               AchievementService achievementService,
+                               ActivitySyncService activitySyncService) {
         this.characterService = characterService;
         this.gameEngineService = gameEngineService;
         this.dailyQuestService = dailyQuestService;
         this.achievementService = achievementService;
+        this.activitySyncService = activitySyncService;
     }
 
     /**
@@ -158,6 +164,21 @@ public class CharacterController {
         Character updated = characterService.updateCustomization(
                 id, principal.getId(), request.getAvatarId(), request.getTitleAchievementCode());
         return ResponseEntity.ok(CharacterSheetResponse.from(updated));
+    }
+
+    /**
+     * Ingests steps/active-minutes from any source (self-reported today — no
+     * OAuth/device wiring yet) and converts activity above configurable
+     * thresholds into STR/CON XP through the normal reward pipeline. Guards
+     * against double-crediting the same (character, source, date) combination.
+     * {@code POST /api/character/{id}/activity-sync}
+     */
+    @PostMapping("/{id}/activity-sync")
+    public ResponseEntity<ActivitySyncResponse> syncActivity(
+            @AuthenticationPrincipal UserPrincipal principal,
+            @PathVariable UUID id,
+            @Valid @RequestBody ActivitySyncRequest request) {
+        return ResponseEntity.ok(activitySyncService.syncActivity(id, principal.getId(), request));
     }
 
     /**
