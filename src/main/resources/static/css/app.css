@@ -93,6 +93,7 @@
   .streak__day { font-family: var(--font-pixel); font-size: 18px; color: var(--amber); letter-spacing: 1px; }
   .streak__day .flame { margin-right: 6px; }
   .streak__buff { font-size: 11px; letter-spacing: 2px; color: var(--dim); margin-top: 4px; text-transform: uppercase; }
+  .streak__freeze { font-size: 11px; color: var(--cyan); margin-top: 6px; }
   .streak__risk { font-size: 11px; color: var(--amber); margin-top: 8px; line-height: 1.4; max-width: 200px; }
 
   .hud__xp { margin-top: 20px; }

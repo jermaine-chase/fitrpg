@@ -45,6 +45,10 @@ public class Character {
     @Column(name = "streak_count", nullable = false)
     private int streakCount = 0;
 
+    /** Grace tokens that preserve the streak on a missed day instead of halving it. */
+    @Column(name = "streak_freeze_count", nullable = false)
+    private int streakFreezeCount = 1;
+
     @Column(name = "last_workout_date")
     private LocalDate lastWorkoutDate;
 
@@ -143,6 +147,14 @@ public class Character {
 
     public void setStreakCount(int streakCount) {
         this.streakCount = streakCount;
+    }
+
+    public int getStreakFreezeCount() {
+        return streakFreezeCount;
+    }
+
+    public void setStreakFreezeCount(int streakFreezeCount) {
+        this.streakFreezeCount = streakFreezeCount;
     }
 
     public LocalDate getLastWorkoutDate() {

@@ -49,6 +49,9 @@ CREATE TABLE IF NOT EXISTS characters (
 -- Add user_id to existing characters tables that predate player accounts.
 ALTER TABLE characters ADD COLUMN IF NOT EXISTS user_id UUID REFERENCES users (id) ON DELETE CASCADE;
 
+-- Grace tokens that preserve a streak on a missed day instead of halving it.
+ALTER TABLE characters ADD COLUMN IF NOT EXISTS streak_freeze_count INT NOT NULL DEFAULT 1;
+
 CREATE TABLE IF NOT EXISTS character_stats (
     id            UUID        PRIMARY KEY,
     character_id  UUID        NOT NULL REFERENCES characters (id) ON DELETE CASCADE,

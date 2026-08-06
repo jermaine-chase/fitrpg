@@ -2,10 +2,12 @@ package com.litrpg.fitness.service;
 
 import com.litrpg.fitness.dto.AchievementResponse;
 import com.litrpg.fitness.model.Achievement;
+import com.litrpg.fitness.model.AchievementCriteriaType;
 import com.litrpg.fitness.model.Character;
 import com.litrpg.fitness.model.CharacterAchievement;
 import com.litrpg.fitness.repository.AchievementRepository;
 import com.litrpg.fitness.repository.CharacterAchievementRepository;
+import com.litrpg.fitness.repository.CharacterRepository;
 import com.litrpg.fitness.repository.WorkoutLogRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -27,16 +29,22 @@ import java.util.stream.Collectors;
 @Service
 public class AchievementService {
 
+    /** Streak freezes granted whenever a STREAK_MILESTONE badge unlocks. */
+    private static final int STREAK_MILESTONE_FREEZE_GRANT = 1;
+
     private final AchievementRepository achievementRepository;
     private final CharacterAchievementRepository characterAchievementRepository;
     private final WorkoutLogRepository workoutLogRepository;
+    private final CharacterRepository characterRepository;
 
     public AchievementService(AchievementRepository achievementRepository,
                                CharacterAchievementRepository characterAchievementRepository,
-                               WorkoutLogRepository workoutLogRepository) {
+                               WorkoutLogRepository workoutLogRepository,
+                               CharacterRepository characterRepository) {
         this.achievementRepository = achievementRepository;
         this.characterAchievementRepository = characterAchievementRepository;
         this.workoutLogRepository = workoutLogRepository;
+        this.characterRepository = characterRepository;
     }
 
     /**
@@ -54,6 +62,7 @@ public class AchievementService {
                 .collect(Collectors.toSet());
 
         List<Achievement> newlyUnlocked = new ArrayList<>();
+        boolean grantedFreeze = false;
         for (Achievement a : achievementRepository.findAll()) {
             if (alreadyUnlocked.contains(a.getCode())) {
                 continue;
@@ -61,7 +70,14 @@ public class AchievementService {
             if (isEarned(a, character, totalClaims)) {
                 characterAchievementRepository.save(new CharacterAchievement(character.getId(), a.getCode()));
                 newlyUnlocked.add(a);
+                if (a.getCriteriaType() == AchievementCriteriaType.STREAK_MILESTONE) {
+                    character.setStreakFreezeCount(character.getStreakFreezeCount() + STREAK_MILESTONE_FREEZE_GRANT);
+                    grantedFreeze = true;
+                }
             }
+        }
+        if (grantedFreeze) {
+            characterRepository.save(character);
         }
         return newlyUnlocked;
     }

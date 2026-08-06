@@ -148,7 +148,7 @@ public class GameEngineService {
         int existingStreak = character.getStreakCount();
         double streakMultiplier = 1.0 + Math.min(existingStreak * STREAK_BONUS_PER_DAY, MAX_STREAK_BONUS);
 
-        int updatedStreak = computeNewStreak(character.getLastWorkoutDate(), existingStreak, today);
+        int updatedStreak = computeNewStreak(character, today);
         character.setStreakCount(updatedStreak);
         character.setLastWorkoutDate(today);
 
@@ -228,10 +228,15 @@ public class GameEngineService {
      *   <li>never trained before → start at 1</li>
      *   <li>already trained today → unchanged (no double-count)</li>
      *   <li>trained yesterday → +1 (consecutive)</li>
-     *   <li>missed one or more days → halved (floored, min 1) instead of full reset</li>
+     *   <li>missed one or more days, with a streak freeze available → consume
+     *       one freeze and preserve the streak unchanged instead of halving it</li>
+     *   <li>missed one or more days, no freeze available → halved (floored, min 1)
+     *       instead of full reset</li>
      * </ul>
      */
-    private int computeNewStreak(LocalDate lastWorkoutDate, int existingStreak, LocalDate today) {
+    private int computeNewStreak(Character character, LocalDate today) {
+        LocalDate lastWorkoutDate = character.getLastWorkoutDate();
+        int existingStreak = character.getStreakCount();
         if (lastWorkoutDate == null) {
             return 1;
         }
@@ -241,6 +246,12 @@ public class GameEngineService {
         }
         if (daysSince == 1) {
             return existingStreak + 1;
+        }
+        if (character.getStreakFreezeCount() > 0) {
+            character.setStreakFreezeCount(character.getStreakFreezeCount() - 1);
+            log.info("Character {} used a streak freeze — DAY {} preserved ({} freeze(s) left).",
+                    character.getId(), existingStreak, character.getStreakFreezeCount());
+            return existingStreak;
         }
         return Math.max(1, existingStreak / 2);
     }

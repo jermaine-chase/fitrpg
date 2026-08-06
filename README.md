@@ -60,6 +60,14 @@ com.litrpg.fitness
 - **Streak soft-landing:** consecutive day → +1; missed day(s) → halved (min 1),
   never reset to 0. Claiming a quest a second time on the same day is
   rejected (409) — the streak/XP pipeline only advances once per day.
+- **Streak freeze:** each character starts with 1 `streakFreezeCount` (grace
+  token) and earns another every time a `STREAK_MILESTONE` achievement
+  unlocks (see Achievements below). Evaluated at the same point as the
+  soft-landing rule above — the streak is checked lazily on next claim, not
+  via a nightly job — a missed day consumes one freeze and preserves the
+  streak unchanged *instead of* halving it, if one is available; otherwise
+  the normal halving applies. `streakFreezesAvailable` is exposed on the
+  character sheet.
 - **Daily Focus quest:** on first request each day, a character is assigned
   one quest — biased toward whichever of their four stats is currently
   weakest — as their "Daily Focus". Claiming it grants an extra +25% XP on

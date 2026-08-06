@@ -343,12 +343,15 @@ function renderHud() {
   }
   $('#streakDay').textContent = c.streakCount;
   $('#buffVal').textContent   = multiplierFor(c.streakCount).toFixed(2);
+  $('#streakFreezeCount').textContent = c.streakFreezesAvailable;
 
   const riskEl = $('#streakRisk');
   const atRisk = c.streakCount > 0 && c.lastWorkoutDate !== todayStr();
   riskEl.hidden = !atRisk;
   if (atRisk) {
-    riskEl.textContent = `Streak open until midnight — one quest keeps DAY ${c.streakCount} going. A missed day halves it, it won't reset to zero.`;
+    riskEl.textContent = c.streakFreezesAvailable > 0
+      ? `Streak open until midnight — one quest keeps DAY ${c.streakCount} going. A missed day would burn a 🧊 freeze to preserve it instead of halving.`
+      : `Streak open until midnight — one quest keeps DAY ${c.streakCount} going. A missed day halves it, it won't reset to zero.`;
   }
 }
 
@@ -553,6 +556,10 @@ function logClaimOutcome(questId, prev, result) {
     pushLog('system', `Streak extended — <span class="hl">DAY ${next.streakCount}</span>`);
   else if (next.streakCount < prev.streakCount)
     pushLog('decay', `Streak fractured — soft landing to <span class="hl">DAY ${next.streakCount}</span>`);
+  else if (next.streakFreezesAvailable < prev.streakFreezesAvailable)
+    pushLog('system', `🧊 Streak freeze consumed — <span class="hl">DAY ${next.streakCount}</span> preserved (${next.streakFreezesAvailable} left)`);
+  if (next.streakFreezesAvailable > prev.streakFreezesAvailable)
+    pushLog('system', `🧊 Streak freeze earned — <span class="hl">${next.streakFreezesAvailable} available</span>`);
 
   if (next.currentLevel > prev.currentLevel)
     pushLog('level', `Operative ascends — <span class="hl">LV ${next.currentLevel}</span>`);

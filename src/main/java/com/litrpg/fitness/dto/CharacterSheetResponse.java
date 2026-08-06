@@ -24,6 +24,7 @@ public class CharacterSheetResponse {
     private int overallXp;
     private int xpForNextLevel;
     private int streakCount;
+    private int streakFreezesAvailable;
     private LocalDate lastWorkoutDate;
     private LocalDateTime createdAt;
     private List<StatResponse> stats;
@@ -36,6 +37,7 @@ public class CharacterSheetResponse {
         r.overallXp = character.getOverallXp();
         r.xpForNextLevel = GameFormulas.xpForNextLevel(character.getCurrentLevel());
         r.streakCount = character.getStreakCount();
+        r.streakFreezesAvailable = character.getStreakFreezeCount();
         r.lastWorkoutDate = character.getLastWorkoutDate();
         r.createdAt = character.getCreatedAt();
         r.stats = character.getStats().stream()
@@ -67,6 +69,10 @@ public class CharacterSheetResponse {
 
     public int getStreakCount() {
         return streakCount;
+    }
+
+    public int getStreakFreezesAvailable() {
+        return streakFreezesAvailable;
     }
 
     public LocalDate getLastWorkoutDate() {
