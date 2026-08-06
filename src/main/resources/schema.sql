@@ -200,6 +200,39 @@ UPDATE quests SET tag = 'STRENGTH',  estimated_minutes = 120 WHERE quest_id = 'Q
 UPDATE quests SET tag = 'INTENSE',   estimated_minutes = 30  WHERE quest_id = 'Q-4003' AND tag IS NULL;
 UPDATE quests SET tag = 'RECOVERY',  estimated_minutes = 90  WHERE quest_id = 'Q-4004' AND tag IS NULL;
 
+CREATE TABLE IF NOT EXISTS achievements (
+    code          VARCHAR(50)  PRIMARY KEY,
+    name          VARCHAR(255) NOT NULL,
+    description   TEXT,
+    icon          VARCHAR(10)  NOT NULL,
+    criteria_type VARCHAR(30)  NOT NULL,
+    threshold     INT          NOT NULL
+);
+
+-- Seed the badge catalog (idempotent via ON CONFLICT DO NOTHING).
+INSERT INTO achievements (code, name, description, icon, criteria_type, threshold)
+VALUES
+    ('FIRST_STEPS',  'First Steps',       'Claim your very first quest.',                          '🥾', 'FIRST_CLAIM',             1),
+    ('LEVEL_10',     'Rising Operative',  'Reach character level 10.',                              '⭐', 'LEVEL_MILESTONE',         10),
+    ('LEVEL_25',     'Veteran Operative', 'Reach character level 25.',                              '🌟', 'LEVEL_MILESTONE',         25),
+    ('LEVEL_50',     'Iron Legend',       'Reach character level 50.',                              '👑', 'LEVEL_MILESTONE',         50),
+    ('STREAK_7',     'One Week Strong',   'Reach a 7-day training streak.',                         '🔥', 'STREAK_MILESTONE',        7),
+    ('STREAK_30',    'Unbreakable',       'Reach a 30-day training streak.',                        '🌋', 'STREAK_MILESTONE',        30),
+    ('CLAIMS_50',    'Grinder',           'Claim 50 quests over your lifetime.',                    '⚔️', 'TOTAL_CLAIMS_MILESTONE',  50),
+    ('CLAIMS_200',   'Relentless',        'Claim 200 quests over your lifetime.',                   '🗡️', 'TOTAL_CLAIMS_MILESTONE',  200),
+    ('BALANCED_10',  'Well Rounded',      'Bring all four attributes to level 10 simultaneously.',  '🧭', 'ALL_STATS_LEVEL',         10)
+ON CONFLICT (code) DO NOTHING;
+
+CREATE TABLE IF NOT EXISTS character_achievements (
+    id               UUID        PRIMARY KEY,
+    character_id     UUID        NOT NULL REFERENCES characters (id) ON DELETE CASCADE,
+    achievement_code VARCHAR(50) NOT NULL REFERENCES achievements (code) ON DELETE CASCADE,
+    unlocked_at      TIMESTAMP   NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT uq_character_achievement UNIQUE (character_id, achievement_code)
+);
+
+CREATE INDEX IF NOT EXISTS idx_character_achievements_character_id ON character_achievements (character_id);
+
 CREATE TABLE IF NOT EXISTS friendships (
     id                   UUID        PRIMARY KEY,
     requester_id         UUID        NOT NULL REFERENCES users (id) ON DELETE CASCADE,

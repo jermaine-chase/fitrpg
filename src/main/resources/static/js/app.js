@@ -136,6 +136,7 @@ const API = {
   getMine: ()    => apiFetch('/api/character/mine'),
   claim:  (id, questId) => apiFetch(`/api/character/${id}/claim`, { method: 'POST', body: JSON.stringify({ questId }) }),
   history: id    => apiFetch(`/api/character/${id}/history`),
+  achievements: id => apiFetch(`/api/character/${id}/achievements`),
   daily:   id    => apiFetch(`/api/character/${id}/daily`),
   quests: (level, tag) => apiFetch('/api/quests?level=' + level + (tag ? '&tag=' + encodeURIComponent(tag) : '')),
   remove: id     => apiFetch('/api/character/' + id, { method: 'DELETE' }),
@@ -507,6 +508,10 @@ async function claimQuest(questId) {
     if (leveledUp) { playLevelUpCue(); flashPanel('levelup'); pulseLevelBadge(); }
     else playXpGainCue();
     if (bonusRolled) { playBonusCue(); flashPanel('bonus'); }
+    if (result.newAchievements && result.newAchievements.length > 0) {
+      showAchievementToasts(result.newAchievements);
+      result.newAchievements.forEach(a => pushLog('system', `🏅 Badge unlocked — <span class="hl">${esc(a.name)}</span>`));
+    }
 
     // re-fetch quests if the character leveled up (new tiers may unlock)
     if (leveledUp) {
@@ -834,6 +839,52 @@ function saveApiBaseFromAccount() {
   pushLog('system', `SYSTEM: API base updated to <span class="hl">${esc(API_BASE || 'same origin')}</span>. Reload to reconnect.`);
 }
 
+/* ========================== badges ========================================= */
+async function openBadges() {
+  $('#badgesErr').textContent = '';
+  $('#badgeGrid').innerHTML = '<div class="friend-empty">Loading…</div>';
+  $('#badgesOverlay').classList.add('show');
+  try {
+    const badges = await API.achievements(state.char.id);
+    renderBadgeGrid(badges);
+  } catch (e) {
+    $('#badgeGrid').innerHTML = '';
+    $('#badgesErr').textContent = e.message || 'Failed to load badges.';
+  }
+}
+function closeBadges() { $('#badgesOverlay').classList.remove('show'); }
+
+function renderBadgeGrid(badges) {
+  $('#badgeGrid').innerHTML = badges.map(b => `
+    <div class="badge-tile ${b.unlocked ? 'unlocked' : 'locked'}">
+      <div class="badge-tile__icon">${b.unlocked ? esc(b.icon) : '❔'}</div>
+      <div class="badge-tile__name">${esc(b.name)}</div>
+      <div class="badge-tile__desc">${esc(b.description)}</div>
+      ${b.unlocked ? `<div class="badge-tile__date">${esc((b.unlockedAt || '').slice(0, 10))}</div>` : ''}
+    </div>`).join('');
+}
+
+/* Toast shown when a claim unlocks one or more badges — result.newAchievements
+   from the claim response, rendered without a round trip to the catalog. */
+function showAchievementToasts(achievements) {
+  const stack = $('#toastStack');
+  achievements.forEach((a, i) => {
+    setTimeout(() => {
+      const el = document.createElement('div');
+      el.className = 'toast';
+      el.innerHTML = `
+        <span class="toast__icon">${esc(a.icon)}</span>
+        <span>
+          <div class="toast__title">Badge Unlocked</div>
+          <div class="toast__name">${esc(a.name)}</div>
+          <div class="toast__desc">${esc(a.description)}</div>
+        </span>`;
+      stack.appendChild(el);
+      setTimeout(() => el.remove(), 5100);
+    }, i * 300);
+  });
+}
+
 /* ========================== friends ======================================== */
 const VIS_LABEL = { NONE: 'Hidden', BASIC: 'Basic', FULL: 'Full' };
 let friendsState = { tab: 'list', friends: [], incoming: [], outgoing: [], feed: [], defaultVisibility: 'BASIC', detail: null };
@@ -1084,6 +1135,9 @@ async function boot() {
   $('#ovToggleMode').addEventListener('click', e => { e.preventDefault(); toggleOverlayMode(); });
   $('#ovForgotLink').addEventListener('click', e => { e.preventDefault(); openOverlay('forgot'); });
 
+  $('#openBadgesBtn').addEventListener('click', openBadges);
+  $('#badgesCloseBtn').addEventListener('click', closeBadges);
+  $('#badgesOverlay').addEventListener('click', e => { if (e.target.id === 'badgesOverlay') closeBadges(); });
   $('#openFriendsBtn').addEventListener('click', openFriends);
   $('#openAccountBtn').addEventListener('click', openAccountOverlay);
   $('#accountCloseBtn').addEventListener('click', closeAccountOverlay);

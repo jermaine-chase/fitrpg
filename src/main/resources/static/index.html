@@ -13,6 +13,7 @@
   <div class="app" id="app" hidden>
     <div class="topbar">
       <span class="conn"><span class="dot" id="connDot"></span><span id="connText">connecting…</span></span>
+      <button class="friends-link" id="openBadgesBtn">🏅 Badges</button>
       <button class="friends-link" id="openFriendsBtn">☍ Allies</button>
       <button class="friends-link" id="openAccountBtn">🔑 Account</button>
       <button class="friends-link" id="logoutBtn">⏻ Logout</button>
@@ -164,6 +165,20 @@
       </div>
     </div>
   </div>
+
+  <!-- badges overlay -->
+  <div class="overlay" id="badgesOverlay">
+    <div class="panel overlay__card">
+      <button class="ov-close" id="badgesCloseBtn" aria-label="Close">✕</button>
+      <h2 class="panel-title"><span class="glyph">🏅</span> Badge Case</h2>
+      <p class="overlay__sub">Earned automatically as you play — nothing to claim, just keep training.</p>
+      <div class="overlay__err" id="badgesErr"></div>
+      <div class="badge-grid" id="badgeGrid"></div>
+    </div>
+  </div>
+
+  <!-- achievement unlock toasts -->
+  <div class="toast-stack" id="toastStack"></div>
 
   <!-- friends overlay -->
   <div class="overlay" id="friendsOverlay">

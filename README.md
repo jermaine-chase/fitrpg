@@ -21,12 +21,12 @@ their account with a security question if they forget their password.
 com.litrpg.fitness
 ├── config       DataSourceConfig (DATABASE_URL support), SecurityConfig, WebConfig (CORS)
 ├── security     JwtService, JwtAuthenticationFilter, UserPrincipal — player JWT auth
-├── model        User, Character, CharacterStat, WorkoutLog, Quest, StatType,
+├── model        User, Character, CharacterStat, WorkoutLog, Quest, QuestTag, StatType,
 │                DailyQuestAssignment, Friendship, FriendshipStatus, FriendVisibility,
-│                RevokedToken
+│                RevokedToken, Achievement, AchievementCriteriaType, CharacterAchievement
 ├── repository   JpaRepository interfaces
 ├── service      AuthService, GameEngineService, CharacterService, DailyQuestService,
-│                FriendService, MidnightDecayService, GameFormulas
+│                FriendService, MidnightDecayService, GameFormulas, AchievementService
 ├── dto          Auth/Character/Quest/Friend/DailyQuest request & response DTOs
 ├── controller   AuthController, CharacterController, QuestController,
 │                FriendController, AdminController
@@ -50,6 +50,8 @@ com.litrpg.fitness
   "Daily Focus" for a given date.
 - **User / Friendship** — player accounts and the friend graph between them,
   with per-friendship visibility overrides.
+- **Achievement / CharacterAchievement** — a badge catalog and each
+  character's unlocked subset, evaluated inline at claim time.
 
 ## Game rules
 
@@ -146,6 +148,31 @@ happened, `FULL` shows the quest, stat, and XP earned.
 `GET /api/character/{id}/history` returns the character's full claim history
 (most recent first), which the frontend uses to chart daily XP earned over
 the last 14 days and the all-time XP split across the four stats.
+
+## Achievements / badges
+
+A catalog of badges (`Achievement`: code, name, description, icon, a
+criteria type, and a threshold) is evaluated against data already captured
+on `Character` and in `workout_logs` — there's no separate polling job.
+Evaluation runs inline at the end of every quest claim
+(`GameEngineService.claimQuestRewards` → `AchievementService.evaluateUnlocks`),
+so a claim's response (`POST /api/character/{id}/claim`) includes any
+newly-unlocked badges alongside the usual character sheet.
+
+Criteria types:
+
+- **`FIRST_CLAIM`** — lifetime claim count reaches the threshold (seeded at 1).
+- **`LEVEL_MILESTONE`** — `currentLevel >= threshold`.
+- **`STREAK_MILESTONE`** — `streakCount >= threshold`.
+- **`TOTAL_CLAIMS_MILESTONE`** — lifetime claim count reaches the threshold.
+- **`ALL_STATS_LEVEL`** — all four stats simultaneously `>= threshold`.
+
+`GET /api/character/{id}/achievements` returns the full catalog for a
+character, locked entries included (so the frontend can render a "?"
+placeholder for what's left to earn). Each character can unlock a given
+badge only once (`character_achievements` has a unique constraint on
+`(character_id, achievement_code)`). The frontend shows a "Badges" panel
+plus a toast the moment a claim unlocks one.
 
 ## Run locally
 

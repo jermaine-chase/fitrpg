@@ -1,9 +1,11 @@
 package com.litrpg.fitness.service;
 
+import com.litrpg.fitness.dto.AchievementUnlockDTO;
 import com.litrpg.fitness.dto.BonusChallengeDTO;
 import com.litrpg.fitness.dto.ClaimRewardResponse;
 import com.litrpg.fitness.dto.CharacterSheetResponse;
 import com.litrpg.fitness.exception.ResourceNotFoundException;
+import com.litrpg.fitness.model.Achievement;
 import com.litrpg.fitness.model.Character;
 import com.litrpg.fitness.model.CharacterStat;
 import com.litrpg.fitness.model.Quest;
@@ -83,15 +85,18 @@ public class GameEngineService {
     private final QuestRepository questRepository;
     private final WorkoutLogRepository workoutLogRepository;
     private final DailyQuestService dailyQuestService;
+    private final AchievementService achievementService;
 
     public GameEngineService(CharacterRepository characterRepository,
                              QuestRepository questRepository,
                              WorkoutLogRepository workoutLogRepository,
-                             DailyQuestService dailyQuestService) {
+                             DailyQuestService dailyQuestService,
+                             AchievementService achievementService) {
         this.characterRepository = characterRepository;
         this.questRepository = questRepository;
         this.workoutLogRepository = workoutLogRepository;
         this.dailyQuestService = dailyQuestService;
+        this.achievementService = achievementService;
     }
 
     public int xpForNextLevel(int currentLevel) {
@@ -203,7 +208,18 @@ public class GameEngineService {
                 levelScale, streakMultiplier,
                 finalCharacterXp + finalStatXp, updatedStreak);
 
-        return new ClaimRewardResponse(CharacterSheetResponse.from(saved), bonusChallenge, dailyFocusBonusXp);
+        // 7. Evaluate badge unlocks against the post-claim state.
+        List<Achievement> unlocked = achievementService.evaluateUnlocks(saved);
+        List<AchievementUnlockDTO> newAchievements = unlocked.stream()
+                .map(AchievementUnlockDTO::from)
+                .toList();
+        if (!unlocked.isEmpty()) {
+            log.info("Character {} unlocked {} achievement(s): {}", characterId, unlocked.size(),
+                    unlocked.stream().map(Achievement::getCode).toList());
+        }
+
+        return new ClaimRewardResponse(CharacterSheetResponse.from(saved), bonusChallenge, dailyFocusBonusXp,
+                newAchievements);
     }
 
     /**

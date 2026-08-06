@@ -1,5 +1,6 @@
 package com.litrpg.fitness.controller;
 
+import com.litrpg.fitness.dto.AchievementResponse;
 import com.litrpg.fitness.dto.CharacterSheetResponse;
 import com.litrpg.fitness.dto.ClaimQuestRequest;
 import com.litrpg.fitness.dto.ClaimRewardResponse;
@@ -8,6 +9,7 @@ import com.litrpg.fitness.dto.DailyQuestResponse;
 import com.litrpg.fitness.dto.WorkoutLogEntryResponse;
 import com.litrpg.fitness.model.Character;
 import com.litrpg.fitness.security.UserPrincipal;
+import com.litrpg.fitness.service.AchievementService;
 import com.litrpg.fitness.service.CharacterService;
 import com.litrpg.fitness.service.DailyQuestService;
 import com.litrpg.fitness.service.GameEngineService;
@@ -38,13 +40,16 @@ public class CharacterController {
     private final CharacterService characterService;
     private final GameEngineService gameEngineService;
     private final DailyQuestService dailyQuestService;
+    private final AchievementService achievementService;
 
     public CharacterController(CharacterService characterService,
                                GameEngineService gameEngineService,
-                               DailyQuestService dailyQuestService) {
+                               DailyQuestService dailyQuestService,
+                               AchievementService achievementService) {
         this.characterService = characterService;
         this.gameEngineService = gameEngineService;
         this.dailyQuestService = dailyQuestService;
+        this.achievementService = achievementService;
     }
 
     /**
@@ -124,6 +129,18 @@ public class CharacterController {
             @AuthenticationPrincipal UserPrincipal principal,
             @PathVariable UUID id) {
         return ResponseEntity.ok(characterService.getOwnedWorkoutHistory(id, principal.getId()));
+    }
+
+    /**
+     * The owned character's full badge catalog, locked entries included.
+     * {@code GET /api/character/{id}/achievements}
+     */
+    @GetMapping("/{id}/achievements")
+    public ResponseEntity<List<AchievementResponse>> getAchievements(
+            @AuthenticationPrincipal UserPrincipal principal,
+            @PathVariable UUID id) {
+        characterService.getOwnedCharacter(id, principal.getId());
+        return ResponseEntity.ok(achievementService.getCatalogForCharacter(id));
     }
 
     /**
