@@ -137,6 +137,7 @@ const API = {
   claim:  (id, questId) => apiFetch(`/api/character/${id}/claim`, { method: 'POST', body: JSON.stringify({ questId }) }),
   history: id    => apiFetch(`/api/character/${id}/history`),
   achievements: id => apiFetch(`/api/character/${id}/achievements`),
+  leaderboard: (scope, metric) => apiFetch(`/api/leaderboard?scope=${encodeURIComponent(scope)}&metric=${encodeURIComponent(metric)}`),
   daily:   id    => apiFetch(`/api/character/${id}/daily`),
   quests: (level, tag) => apiFetch('/api/quests?level=' + level + (tag ? '&tag=' + encodeURIComponent(tag) : '')),
   remove: id     => apiFetch('/api/character/' + id, { method: 'DELETE' }),
@@ -892,6 +893,54 @@ function showAchievementToasts(achievements) {
   });
 }
 
+/* ========================== leaderboard ===================================== */
+const LB_METRIC_LABEL = { level: 'LV', xp: 'XP', streak: 'DAY' };
+let lbState = { scope: 'global', metric: 'level' };
+
+function openLeaderboard() {
+  $('#leaderboardOverlay').classList.add('show');
+  loadLeaderboard();
+}
+function closeLeaderboard() { $('#leaderboardOverlay').classList.remove('show'); }
+
+async function loadLeaderboard() {
+  $('#leaderboardErr').textContent = '';
+  $('#leaderboardBody').innerHTML = '<div class="friend-empty">Loading…</div>';
+  try {
+    const rows = await API.leaderboard(lbState.scope, lbState.metric);
+    renderLeaderboard(rows);
+  } catch (e) {
+    $('#leaderboardBody').innerHTML = '';
+    $('#leaderboardErr').textContent = e.message || 'Failed to load rankings.';
+  }
+}
+
+function renderLeaderboard(rows) {
+  const body = $('#leaderboardBody');
+  if (rows.length === 0) {
+    body.innerHTML = '<div class="friend-empty">No ranked operatives yet.</div>';
+    return;
+  }
+  const unit = LB_METRIC_LABEL[lbState.metric] || '';
+  body.innerHTML = rows.map(r => `
+    <div class="frow" style="cursor:default;">
+      <span class="frow__meta" style="width:28px; flex:none;">#${r.rank}</span>
+      <span class="frow__name" style="cursor:default; flex:1;">${esc(r.characterName)} <span class="frow__meta">@${esc(r.username)}</span></span>
+      <span class="frow__meta">${r.value} ${unit}</span>
+    </div>`).join('');
+}
+
+function switchLeaderboardScope(scope) {
+  lbState.scope = scope;
+  $('#lbScopeTabs').querySelectorAll('.ftab').forEach(b => b.classList.toggle('active', b.dataset.scope === scope));
+  loadLeaderboard();
+}
+function switchLeaderboardMetric(metric) {
+  lbState.metric = metric;
+  $('#lbMetricTabs').querySelectorAll('.ftab').forEach(b => b.classList.toggle('active', b.dataset.metric === metric));
+  loadLeaderboard();
+}
+
 /* ========================== friends ======================================== */
 const VIS_LABEL = { NONE: 'Hidden', BASIC: 'Basic', FULL: 'Full' };
 let friendsState = { tab: 'list', friends: [], incoming: [], outgoing: [], feed: [], defaultVisibility: 'BASIC', detail: null };
@@ -1145,6 +1194,11 @@ async function boot() {
   $('#openBadgesBtn').addEventListener('click', openBadges);
   $('#badgesCloseBtn').addEventListener('click', closeBadges);
   $('#badgesOverlay').addEventListener('click', e => { if (e.target.id === 'badgesOverlay') closeBadges(); });
+  $('#openLeaderboardBtn').addEventListener('click', openLeaderboard);
+  $('#leaderboardCloseBtn').addEventListener('click', closeLeaderboard);
+  $('#leaderboardOverlay').addEventListener('click', e => { if (e.target.id === 'leaderboardOverlay') closeLeaderboard(); });
+  $('#lbScopeTabs').querySelectorAll('.ftab').forEach(b => b.addEventListener('click', () => switchLeaderboardScope(b.dataset.scope)));
+  $('#lbMetricTabs').querySelectorAll('.ftab').forEach(b => b.addEventListener('click', () => switchLeaderboardMetric(b.dataset.metric)));
   $('#openFriendsBtn').addEventListener('click', openFriends);
   $('#openAccountBtn').addEventListener('click', openAccountOverlay);
   $('#accountCloseBtn').addEventListener('click', closeAccountOverlay);

@@ -14,6 +14,7 @@
     <div class="topbar">
       <span class="conn"><span class="dot" id="connDot"></span><span id="connText">connecting…</span></span>
       <button class="friends-link" id="openBadgesBtn">🏅 Badges</button>
+      <button class="friends-link" id="openLeaderboardBtn">🏆 Rankings</button>
       <button class="friends-link" id="openFriendsBtn">☍ Allies</button>
       <button class="friends-link" id="openAccountBtn">🔑 Account</button>
       <button class="friends-link" id="logoutBtn">⏻ Logout</button>
@@ -175,6 +176,27 @@
       <p class="overlay__sub">Earned automatically as you play — nothing to claim, just keep training.</p>
       <div class="overlay__err" id="badgesErr"></div>
       <div class="badge-grid" id="badgeGrid"></div>
+    </div>
+  </div>
+
+  <!-- leaderboard overlay -->
+  <div class="overlay" id="leaderboardOverlay">
+    <div class="panel overlay__card friends-card">
+      <button class="ov-close" id="leaderboardCloseBtn" aria-label="Close">✕</button>
+      <h2 class="panel-title"><span class="glyph">🏆</span> Rankings</h2>
+
+      <div class="friends-tabs" id="lbScopeTabs">
+        <button class="ftab active" data-scope="global">Global</button>
+        <button class="ftab" data-scope="friends">Friends</button>
+      </div>
+      <div class="friends-tabs" id="lbMetricTabs" style="margin-top:-6px;">
+        <button class="ftab active" data-metric="level">By Level</button>
+        <button class="ftab" data-metric="xp">By Lifetime XP</button>
+        <button class="ftab" data-metric="streak">By Streak</button>
+      </div>
+
+      <div class="overlay__err" id="leaderboardErr"></div>
+      <div class="friend-list" id="leaderboardBody"></div>
     </div>
   </div>
 

@@ -29,7 +29,7 @@ com.litrpg.fitness
 │                FriendService, MidnightDecayService, GameFormulas, AchievementService
 ├── dto          Auth/Character/Quest/Friend/DailyQuest request & response DTOs
 ├── controller   AuthController, CharacterController, QuestController,
-│                FriendController, AdminController
+│                FriendController, AdminController, LeaderboardController
 └── exception    ResourceNotFoundException, GlobalExceptionHandler
 ```
 
@@ -150,6 +150,18 @@ visibility level also gates the **activity feed**
 (`GET /api/friends/feed`), which surfaces friends' recent quest claims —
 `NONE` friends are omitted entirely, `BASIC` shows only that a claim
 happened, `FULL` shows the quest, stat, and XP earned.
+
+## Leaderboards
+
+`GET /api/leaderboard?scope=global|friends&metric=level|xp|streak&limit=20`
+(auth required — the `friends` scope needs to know who's asking) ranks
+characters by current level, lifetime XP (every completed level's threshold
+plus progress in the current one — not the in-level `overallXp` alone), or
+streak. `scope=global` ranks every character on the instance; `scope=friends`
+ranks the caller's own character plus accepted friends, trimmed by the same
+visibility rule as the activity feed — a friend whose granted visibility is
+`NONE` is excluded entirely, `BASIC` and `FULL` are both included (the
+leaderboard only needs a name and a number, not the full sheet).
 
 ## Progress dashboard
 
