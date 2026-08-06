@@ -55,7 +55,7 @@ public class FriendService {
     /** Sends a friend request from {@code requesterId} to the user named {@code targetUsername}. */
     @Transactional
     public FriendshipResponse sendRequest(UUID requesterId, String targetUsername) {
-        User target = userRepository.findByUsername(targetUsername)
+        User target = userRepository.findByUsernameIgnoreCase(targetUsername)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found: " + targetUsername));
         if (target.getId().equals(requesterId)) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Cannot friend yourself");
