@@ -24,11 +24,11 @@ com.litrpg.fitness
 ├── model        User, Character, CharacterStat, WorkoutLog, Quest, QuestTag, StatType,
 │                DailyQuestAssignment, Friendship, FriendshipStatus, FriendVisibility,
 │                RevokedToken, Achievement, AchievementCriteriaType, CharacterAchievement,
-│                LeaderboardScope, LeaderboardMetric
+│                LeaderboardScope, LeaderboardMetric, QuestStatus
 ├── repository   JpaRepository interfaces
 ├── service      AuthService, GameEngineService, CharacterService, DailyQuestService,
 │                FriendService, MidnightDecayService, GameFormulas, AchievementService,
-│                LeaderboardService
+│                LeaderboardService, QuestService
 ├── dto          Auth/Character/Quest/Friend/DailyQuest request & response DTOs
 ├── controller   AuthController, CharacterController, QuestController,
 │                FriendController, AdminController, LeaderboardController
@@ -39,12 +39,14 @@ com.litrpg.fitness
 
 - **Character** — a level-1-start avatar with overall level/XP, a login
   streak, and four independently-leveled stats: `STR`, `DEX`, `CON`, `WIL`.
-- **Quest** — an admin-curated catalog of tasks gated by `minLevel` and tied
-  to a target stat. "Logging a workout" means claiming a quest. Each quest
-  may carry an optional category `tag` (`QUICK`, `INTENSE`, `RECOVERY`,
-  `STRENGTH`, `CARDIO`) and an optional `estimatedMinutes`, used for quest
-  board filter chips — both are nullable, so quests created before this
-  feature show up untagged rather than needing a backfill.
+- **Quest** — a catalog of tasks gated by `minLevel` and tied to a target
+  stat. "Logging a workout" means claiming a quest. Each quest may carry an
+  optional category `tag` (`QUICK`, `INTENSE`, `RECOVERY`, `STRENGTH`,
+  `CARDIO`) and an optional `estimatedMinutes`, used for quest board filter
+  chips — both are nullable, so quests created before this feature show up
+  untagged rather than needing a backfill. Quests also carry a `status`
+  (`PENDING`/`APPROVED`/`REJECTED`) and an optional `createdByUserId` — see
+  Player-authored quests below.
 - **WorkoutLog** — an immutable, append-only record of every claim (quest,
   stat trained, XP earned, streak multiplier applied), used for the progress
   dashboard and the friend activity feed.
@@ -152,6 +154,21 @@ visibility level also gates the **activity feed**
 (`GET /api/friends/feed`), which surfaces friends' recent quest claims —
 `NONE` friends are omitted entirely, `BASIC` shows only that a claim
 happened, `FULL` shows the quest, stat, and XP earned.
+
+## Player-authored quests
+
+Alongside the admin-curated catalog, players can pitch their own quest ideas:
+`POST /api/quests/submit` (authenticated) creates a quest with `status`
+`PENDING` and `createdByUserId` set to the submitter — a modest default XP
+reward (50/50) that an admin can adjust. `GET /api/quests` only ever returns
+`APPROVED` quests (`PENDING`/`REJECTED` submissions are invisible and
+unclaimable — attempting to claim one 404s, same as an unknown quest id);
+quests created directly by an admin (`POST /api/admin/quests`) still default
+straight to `APPROVED`, preserving the original behavior. Admins review the
+queue at `GET /api/admin/quests/pending` and resolve each entry with
+`POST /api/admin/quests/{id}/approve` or `.../reject`. The frontend has a
+"Submit a Quest" form on the quest board and a pending-review section in
+the admin console.
 
 ## Character customization
 
@@ -292,10 +309,15 @@ curl http://localhost:8080/api/character/{id}/daily -H "Authorization: Bearer $T
 # Claim history, most recent first
 curl http://localhost:8080/api/character/{id}/history -H "Authorization: Bearer $TOKEN"
 
-# Quest catalog, optionally filtered to a level and/or category tag
+# Quest catalog (APPROVED only), optionally filtered to a level and/or category tag
 curl "http://localhost:8080/api/quests?level=10"
 curl "http://localhost:8080/api/quests?tag=CARDIO"
 curl "http://localhost:8080/api/quests?level=10&tag=CARDIO"
+
+# Submit a quest idea for admin review (starts PENDING)
+curl -X POST http://localhost:8080/api/quests/submit \
+  -H 'Content-Type: application/json' -H "Authorization: Bearer $TOKEN" \
+  -d '{"title":"Ruck March","targetStat":"CON","minLevel":5}'
 ```
 
 `GET` and `claim` both return the character sheet:

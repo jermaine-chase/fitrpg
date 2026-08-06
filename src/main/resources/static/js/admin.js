@@ -94,11 +94,12 @@ async function loadQuests() {
   try {
     const quests = await adminFetch('/api/admin/quests');
     if (quests.length === 0) {
-      tbody.innerHTML = '<tr class="empty-row"><td colspan="9">No quests found.</td></tr>';
+      tbody.innerHTML = '<tr class="empty-row"><td colspan="10">No quests found.</td></tr>';
       return;
     }
     tbody.innerHTML = quests.map(q => {
       const lc = (q.targetStat || '').toLowerCase();
+      const statusClass = q.status === 'APPROVED' ? 'badge-dex' : q.status === 'REJECTED' ? 'badge-str' : 'badge-tier';
       return `<tr data-qid="${esc(q.questId)}" data-tag="${esc(q.tag || '')}" data-minutes="${q.estimatedMinutes || ''}" data-minlevel="${q.minLevel}">
         <td class="td-id">${esc(q.questId)}</td>
         <td class="td-title">${esc(q.title)}</td>
@@ -106,6 +107,7 @@ async function loadQuests() {
         <td><span class="badge badge-${lc}">${esc(q.targetStat)}</span></td>
         <td><span class="badge badge-tier">Tier ${tierLabel(q.minLevel)}</span> <span style="color:var(--dim);font-size:11px">≥${q.minLevel}</span></td>
         <td>${q.tag ? `<span class="badge badge-tag">${esc(q.tag)}</span>` : '<span style="color:var(--faint)">—</span>'}${q.estimatedMinutes ? ` <span style="color:var(--dim);font-size:11px">${q.estimatedMinutes}m</span>` : ''}</td>
+        <td><span class="badge ${statusClass}">${esc(q.status || 'APPROVED')}</span></td>
         <td class="td-num">${q.baseCharacterXp}</td>
         <td class="td-num">${q.baseStatXp}</td>
         <td class="td-acts">
@@ -117,7 +119,48 @@ async function loadQuests() {
     tbody.querySelectorAll('.q-edit').forEach(btn => btn.addEventListener('click', () => openQuestModal('edit', btn.dataset.qid)));
     tbody.querySelectorAll('.q-del').forEach(btn  => btn.addEventListener('click', () => deleteQuest(btn.dataset.qid, btn.dataset.title)));
   } catch (e) {
-    tbody.innerHTML = `<tr class="empty-row"><td colspan="9">Error loading quests: ${esc(e.message)}</td></tr>`;
+    tbody.innerHTML = `<tr class="empty-row"><td colspan="10">Error loading quests: ${esc(e.message)}</td></tr>`;
+  }
+}
+
+/* ========================== pending quest submissions ======================= */
+async function loadPendingQuests() {
+  const tbody = $('#pendingTbody');
+  try {
+    const quests = await adminFetch('/api/admin/quests/pending');
+    if (quests.length === 0) {
+      tbody.innerHTML = '<tr class="empty-row"><td colspan="7">No pending submissions.</td></tr>';
+      return;
+    }
+    tbody.innerHTML = quests.map(q => {
+      const lc = (q.targetStat || '').toLowerCase();
+      return `<tr data-qid="${esc(q.questId)}">
+        <td class="td-title">${esc(q.title)}</td>
+        <td class="td-desc">${esc(q.description || '—')}</td>
+        <td><span class="badge badge-${lc}">${esc(q.targetStat)}</span></td>
+        <td>≥${q.minLevel}</td>
+        <td class="td-num">${q.baseCharacterXp}</td>
+        <td class="td-num">${q.baseStatXp}</td>
+        <td class="td-acts">
+          <button class="btn btn-dex btn-sm p-approve" data-qid="${esc(q.questId)}">Approve</button>
+          <button class="btn btn-danger btn-sm p-reject" data-qid="${esc(q.questId)}">Reject</button>
+        </td>
+      </tr>`;
+    }).join('');
+    tbody.querySelectorAll('.p-approve').forEach(btn => btn.addEventListener('click', () => reviewQuest(btn.dataset.qid, 'approve')));
+    tbody.querySelectorAll('.p-reject').forEach(btn  => btn.addEventListener('click', () => reviewQuest(btn.dataset.qid, 'reject')));
+  } catch (e) {
+    tbody.innerHTML = `<tr class="empty-row"><td colspan="7">Error loading submissions: ${esc(e.message)}</td></tr>`;
+  }
+}
+
+async function reviewQuest(questId, action) {
+  try {
+    await adminFetch(`/api/admin/quests/${encodeURIComponent(questId)}/${action}`, { method: 'POST' });
+    flash(`Quest ${action === 'approve' ? 'approved' : 'rejected'}.`);
+    await Promise.all([loadPendingQuests(), loadQuests()]);
+  } catch (e) {
+    flash(`Failed to ${action}: ${e.message}`, 'err');
   }
 }
 
@@ -155,8 +198,8 @@ function openQuestModal(mode, questId) {
     $('#qf-desc').value     = cells[2].textContent === '—' ? '' : cells[2].textContent;
     $('#qf-stat').value     = row.querySelector('.badge').textContent;
     $('#qf-minlevel').value = row.dataset.minlevel || '1';
-    $('#qf-charxp').value   = cells[6].textContent;
-    $('#qf-statxp').value   = cells[7].textContent;
+    $('#qf-charxp').value   = cells[7].textContent;
+    $('#qf-statxp').value   = cells[8].textContent;
     $('#qf-tag').value      = row.dataset.tag || '';
     $('#qf-minutes').value  = row.dataset.minutes || '';
   }
@@ -318,6 +361,7 @@ async function boot() {
   $('#charModalCancel').addEventListener('click', closeCharModal);
   $('#charOverlay').addEventListener('keydown',   e => { if (e.key === 'Escape') closeCharModal(); });
   $('#refreshCharsBtn').addEventListener('click', loadCharacters);
+  $('#refreshPendingBtn').addEventListener('click', loadPendingQuests);
 
   const token = localStorage.getItem(LS.token);
   if (!token) {
@@ -330,7 +374,7 @@ async function boot() {
     // render an in-table message, so they won't surface a 401/403 here.
     await adminFetch('/api/admin/quests');
     showAdminPanel();
-    await Promise.all([loadQuests(), loadCharacters()]);
+    await Promise.all([loadQuests(), loadCharacters(), loadPendingQuests()]);
   } catch (e) {
     if (e.status === 401 || e.status === 403) {
       // The filter treats an invalid/expired token the same as no token at

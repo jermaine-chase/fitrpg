@@ -8,6 +8,7 @@ import com.litrpg.fitness.exception.ResourceNotFoundException;
 import com.litrpg.fitness.model.Quest;
 import com.litrpg.fitness.repository.QuestRepository;
 import com.litrpg.fitness.service.CharacterService;
+import com.litrpg.fitness.service.QuestService;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -36,10 +37,13 @@ public class AdminController {
 
     private final CharacterService characterService;
     private final QuestRepository questRepository;
+    private final QuestService questService;
 
-    public AdminController(CharacterService characterService, QuestRepository questRepository) {
+    public AdminController(CharacterService characterService, QuestRepository questRepository,
+                            QuestService questService) {
         this.characterService = characterService;
         this.questRepository = questRepository;
+        this.questService = questService;
     }
 
     // ---- Characters --------------------------------------------------------
@@ -115,6 +119,29 @@ public class AdminController {
         }
         questRepository.deleteById(questId);
         return ResponseEntity.noContent().build();
+    }
+
+    // ---- Player quest submissions -------------------------------------------
+
+    /** {@code GET /api/admin/quests/pending} — player-submitted quests awaiting review. */
+    @GetMapping("/quests/pending")
+    public ResponseEntity<List<QuestDTO>> listPendingQuests() {
+        List<QuestDTO> quests = questService.listPending().stream()
+                .map(QuestDTO::from)
+                .collect(Collectors.toList());
+        return ResponseEntity.ok(quests);
+    }
+
+    /** {@code POST /api/admin/quests/{questId}/approve} — moves a pending submission into the public catalog. */
+    @PostMapping("/quests/{questId}/approve")
+    public ResponseEntity<QuestDTO> approveQuest(@PathVariable String questId) {
+        return ResponseEntity.ok(QuestDTO.from(questService.approve(questId)));
+    }
+
+    /** {@code POST /api/admin/quests/{questId}/reject} — marks a pending submission rejected; it stays hidden. */
+    @PostMapping("/quests/{questId}/reject")
+    public ResponseEntity<QuestDTO> rejectQuest(@PathVariable String questId) {
+        return ResponseEntity.ok(QuestDTO.from(questService.reject(questId)));
     }
 
     // ---- helpers -----------------------------------------------------------

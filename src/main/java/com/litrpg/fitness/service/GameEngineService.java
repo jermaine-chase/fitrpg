@@ -9,6 +9,7 @@ import com.litrpg.fitness.model.Achievement;
 import com.litrpg.fitness.model.Character;
 import com.litrpg.fitness.model.CharacterStat;
 import com.litrpg.fitness.model.Quest;
+import com.litrpg.fitness.model.QuestStatus;
 import com.litrpg.fitness.model.StatType;
 import com.litrpg.fitness.model.WorkoutLog;
 import com.litrpg.fitness.repository.CharacterRepository;
@@ -127,6 +128,7 @@ public class GameEngineService {
                         "Character not found: " + characterId));
 
         Quest quest = questRepository.findById(questId)
+                .filter(q -> q.getStatus() == QuestStatus.APPROVED)
                 .orElseThrow(() -> new ResourceNotFoundException(
                         "Quest not found: " + questId));
 

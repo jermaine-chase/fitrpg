@@ -107,6 +107,11 @@ ALTER TABLE quests ADD COLUMN IF NOT EXISTS min_level INT NOT NULL DEFAULT 1;
 ALTER TABLE quests ADD COLUMN IF NOT EXISTS tag VARCHAR(20);
 ALTER TABLE quests ADD COLUMN IF NOT EXISTS estimated_minutes INT;
 
+-- Add the player-submission approval queue. Existing rows (all admin-authored
+-- so far) default to APPROVED, preserving current behavior.
+ALTER TABLE quests ADD COLUMN IF NOT EXISTS status VARCHAR(20) NOT NULL DEFAULT 'APPROVED';
+ALTER TABLE quests ADD COLUMN IF NOT EXISTS created_by_user_id UUID REFERENCES users (id) ON DELETE SET NULL;
+
 -- Seed quests (idempotent via ON CONFLICT DO NOTHING).
 -- Tier 1 — available from level 1
 INSERT INTO quests (quest_id, title, description, target_stat, base_character_xp, base_stat_xp, min_level)

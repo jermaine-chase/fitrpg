@@ -43,6 +43,32 @@
   <div class="page">
     <div class="flash" id="flash"></div>
 
+    <!-- ---- Pending Quest Submissions ---------------------------------------- -->
+    <section class="panel">
+      <div class="section-head">
+        <h2 class="panel-title"><span class="glyph">⏳</span> Pending Quest Submissions</h2>
+        <button class="btn btn-ghost" id="refreshPendingBtn">↻ Refresh</button>
+      </div>
+      <div class="tbl-wrap">
+        <table id="pendingTable">
+          <thead>
+            <tr>
+              <th>Title</th>
+              <th>Description</th>
+              <th>Stat</th>
+              <th>Min Lvl</th>
+              <th style="text-align:right">Char XP</th>
+              <th style="text-align:right">Stat XP</th>
+              <th style="text-align:right">Actions</th>
+            </tr>
+          </thead>
+          <tbody id="pendingTbody">
+            <tr class="empty-row"><td colspan="7">Loading submissions…</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
     <!-- ---- Quest Catalog -------------------------------------------------- -->
     <section class="panel">
       <div class="section-head">
@@ -59,13 +85,14 @@
               <th>Stat</th>
               <th>Min Lvl</th>
               <th>Tag</th>
+              <th>Status</th>
               <th style="text-align:right">Char XP</th>
               <th style="text-align:right">Stat XP</th>
               <th style="text-align:right">Actions</th>
             </tr>
           </thead>
           <tbody id="questTbody">
-            <tr class="empty-row"><td colspan="9">Loading quests…</td></tr>
+            <tr class="empty-row"><td colspan="10">Loading quests…</td></tr>
           </tbody>
         </table>
       </div>

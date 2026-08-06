@@ -95,6 +95,8 @@
   .btn-danger:hover { background: rgba(255,94,94,0.18); }
   .btn-amber { background: rgba(240,169,59,0.1); border: 1px solid rgba(240,169,59,0.4); color: var(--amber); }
   .btn-amber:hover { background: rgba(240,169,59,0.2); }
+  .btn-dex { background: rgba(74,222,128,0.1); border: 1px solid rgba(74,222,128,0.4); color: var(--dex); }
+  .btn-dex:hover { background: rgba(74,222,128,0.2); }
   .btn-sm { padding: 5px 10px; font-size: 9px; }
 
   /* ---- section header ----------------------------------------------------- */

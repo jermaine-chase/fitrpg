@@ -143,6 +143,7 @@ const API = {
   achievements: id => apiFetch(`/api/character/${id}/achievements`),
   leaderboard: (scope, metric) => apiFetch(`/api/leaderboard?scope=${encodeURIComponent(scope)}&metric=${encodeURIComponent(metric)}`),
   setCustomization: (id, avatarId, titleAchievementCode) => apiFetch(`/api/character/${id}/customization`, { method: 'PUT', body: JSON.stringify({ avatarId, titleAchievementCode }) }),
+  submitQuest: body => apiFetch('/api/quests/submit', { method: 'POST', body: JSON.stringify(body) }),
   daily:   id    => apiFetch(`/api/character/${id}/daily`),
   quests: (level, tag) => apiFetch('/api/quests?level=' + level + (tag ? '&tag=' + encodeURIComponent(tag) : '')),
   remove: id     => apiFetch('/api/character/' + id, { method: 'DELETE' }),
@@ -914,6 +915,42 @@ function showAchievementToasts(achievements) {
   });
 }
 
+/* ========================== quest submission ================================= */
+function openSubmitQuest() {
+  $('#submitQuestErr').textContent = '';
+  $('#sq-title').value = '';
+  $('#sq-desc').value = '';
+  $('#sq-stat').value = 'STR';
+  $('#sq-tag').value = '';
+  $('#sq-minlevel').value = '1';
+  $('#sq-minutes').value = '';
+  $('#submitQuestOverlay').classList.add('show');
+}
+function closeSubmitQuest() { $('#submitQuestOverlay').classList.remove('show'); }
+
+async function submitQuestIdea() {
+  const btn = $('#submitQuestSaveBtn'); btn.disabled = true;
+  $('#submitQuestErr').textContent = '';
+  try {
+    const title = $('#sq-title').value.trim();
+    if (!title) { $('#submitQuestErr').textContent = 'Give your quest a title.'; return; }
+    await API.submitQuest({
+      title,
+      description: $('#sq-desc').value.trim(),
+      targetStat: $('#sq-stat').value,
+      tag: $('#sq-tag').value || null,
+      minLevel: parseInt($('#sq-minlevel').value, 10) || 1,
+      estimatedMinutes: $('#sq-minutes').value ? parseInt($('#sq-minutes').value, 10) : null,
+    });
+    closeSubmitQuest();
+    pushLog('system', `SYSTEM: Quest idea "<span class="hl">${esc(title)}</span>" sent for admin review.`);
+  } catch (e) {
+    $('#submitQuestErr').textContent = e.message || 'Failed to submit quest.';
+  } finally {
+    btn.disabled = false;
+  }
+}
+
 /* ========================== customization =================================== */
 let customizeSelectedAvatar = null;
 
@@ -1262,6 +1299,10 @@ async function boot() {
   $('#customizeCloseBtn').addEventListener('click', closeCustomize);
   $('#customizeOverlay').addEventListener('click', e => { if (e.target.id === 'customizeOverlay') closeCustomize(); });
   $('#customizeSaveBtn').addEventListener('click', saveCustomization);
+  $('#openSubmitQuestBtn').addEventListener('click', openSubmitQuest);
+  $('#submitQuestCloseBtn').addEventListener('click', closeSubmitQuest);
+  $('#submitQuestOverlay').addEventListener('click', e => { if (e.target.id === 'submitQuestOverlay') closeSubmitQuest(); });
+  $('#submitQuestSaveBtn').addEventListener('click', submitQuestIdea);
   $('#openLeaderboardBtn').addEventListener('click', openLeaderboard);
   $('#leaderboardCloseBtn').addEventListener('click', closeLeaderboard);
   $('#leaderboardOverlay').addEventListener('click', e => { if (e.target.id === 'leaderboardOverlay') closeLeaderboard(); });
