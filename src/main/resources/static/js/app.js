@@ -334,6 +334,12 @@ function renderHud() {
   $('#charLevel').textContent = c.currentLevel;
   $('#charXp').textContent    = c.overallXp;
   $('#charXpMax').textContent = c.xpForNextLevel;
+  const meter = $('#charXpMeter');
+  if (meter) {
+    meter.setAttribute('aria-valuenow', c.overallXp);
+    meter.setAttribute('aria-valuemax', c.xpForNextLevel);
+    meter.setAttribute('aria-valuetext', `${c.overallXp} of ${c.xpForNextLevel} XP`);
+  }
 
   const fill = $('#charXpFill');
   const targetPct = pct(c.overallXp, c.xpForNextLevel);
@@ -388,7 +394,7 @@ function renderStats() {
           <span class="stat__lv">LV ${s.currentLevel}</span>
           <span class="stat__status ${rusty ? 'is-rusty' : 'is-active'}">${rusty ? 'Rusty' : 'Active'}</span>
         </div>
-        <div class="bar stat__bar"><div class="bar__fill fill-${lc}" data-target="${target}" style="width:${start}%"></div></div>
+        <div class="bar stat__bar" role="meter" aria-label="${esc(STAT_NAME[type] || type)} XP" aria-valuemin="0" aria-valuenow="${s.currentXp}" aria-valuemax="${s.xpForNextLevel}"><div class="bar__fill fill-${lc}" data-target="${target}" style="width:${start}%"></div></div>
         <div class="stat__xp">${s.currentXp} / ${s.xpForNextLevel} XP</div>
       </div>`;
   }).join('');
@@ -1217,7 +1223,7 @@ function renderFriendDetail(d) {
         <div class="xp-row"><span>Character XP</span><span class="xp-val">${c.overallXp} / ${c.xpForNextLevel}</span></div>
         <div class="bar"><div class="bar__fill" style="width:${pct(c.overallXp, c.xpForNextLevel)}%"></div></div>
       </div>
-      <p style="font-size:13px;color:var(--dim);margin:14px 0 12px;">🔥 Streak: <span style="color:var(--amber);">DAY ${c.streakCount}</span></p>
+      <p style="font-size:13px;color:var(--dim);margin:14px 0 12px;">🔥 Streak: <span style="color:var(--brass-bright);">DAY ${c.streakCount}</span></p>
       <div>${c.stats.map(s => {
         const rusty = (s.status || '').toLowerCase() === 'rusty';
         const lc = s.statType.toLowerCase();

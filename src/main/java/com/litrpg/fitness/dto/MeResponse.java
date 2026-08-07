@@ -1,5 +1,7 @@
 package com.litrpg.fitness.dto;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
+
 /**
  * The calling player's own account info, read fresh from the database.
  * Used by the frontend on page load (when there's no fresh login response
@@ -26,6 +28,7 @@ public class MeResponse {
         this.username = username;
     }
 
+    @JsonProperty("isAdmin")
     public boolean isAdmin() {
         return isAdmin;
     }

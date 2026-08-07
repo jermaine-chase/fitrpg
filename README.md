@@ -290,8 +290,13 @@ providers) if one is set, otherwise it falls back to the
 
 ## Frontend (standalone UI)
 
-`src/main/resources/static/` holds two self-contained pages (no build step),
-served by Spring Boot itself at the app's root:
+`src/main/resources/static/` holds two pages (`index.html`, `admin.html`)
+plus their shared `css/` and `js/` assets — no build step, no framework,
+served by Spring Boot itself at the app's root. Visually it goes for a
+field-manual / character-dossier look (dossier cards, stamped level and
+status badges, an instrument-gauge XP bar) rather than a sci-fi HUD, set in
+Staatliches (headings/badges), IBM Plex Sans (body), and IBM Plex Mono
+(stats/log), pulled from a single Google Fonts `<link>`:
 
 - **`index.html`** — the player terminal. Covers registration (including
   setting a security question), login, forgot-password recovery, character
@@ -303,9 +308,10 @@ served by Spring Boot itself at the app's root:
   owned by the server; the JWT and character id are cached in `localStorage`.
   Claiming a quest animates the XP bars (CSS width transitions) and plays a
   short synthesized cue via the Web Audio API — a distinct ascending chime
-  plus a golden HUD flash on level-up, a separate sparkle cue and violet
-  flash when the 15% bonus-challenge roll fires — with no audio assets or
-  build tooling involved.
+  plus a brass "ink-stamp" flash on the HUD and level badge on level-up, a
+  separate sparkle cue and violet flash when the 15% bonus-challenge roll
+  fires — with no audio assets or build tooling involved. Animations respect
+  `prefers-reduced-motion`.
 - **`admin.html`** — the admin console for managing the quest catalog and
   character roster directly. It reuses the same player JWT `index.html`
   stores in `localStorage` (there's no separate admin login); if the signed-in

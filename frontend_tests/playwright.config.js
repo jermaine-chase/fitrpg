@@ -17,7 +17,7 @@ export default defineConfig({
     { name: 'Mobile Safari (iPad)', use: { ...devices['iPad Pro 11'] } },
   ],
   webServer: {
-    command: 'npx http-server ../frontend -p 3001 -c-1 --silent',
+    command: 'npx http-server ../src/main/resources/static -p 3001 -c-1 --silent',
     port: 3001,
     reuseExistingServer: !process.env.CI,
     timeout: 15000,

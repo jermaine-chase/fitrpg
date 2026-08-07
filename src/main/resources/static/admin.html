@@ -6,7 +6,7 @@
 <title>Iron Path — System Admin</title>
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-<link href="https://fonts.googleapis.com/css2?family=Silkscreen:wght@400;700&family=Share+Tech+Mono&display=swap" rel="stylesheet" />
+<link href="https://fonts.googleapis.com/css2?family=Staatliches&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
 <link rel="stylesheet" href="css/admin.css" />
 </head>
 <body>
@@ -27,21 +27,22 @@
 <!-- ===================== ADMIN PANEL ======================================= -->
 <div id="adminPanel" hidden>
 
-  <div class="topbar">
+  <nav class="topbar" aria-label="Primary">
     <div class="topbar__brand">
       <div class="topbar__eyebrow">Iron Path // System Admin</div>
       <div class="topbar__title">Command Interface</div>
     </div>
     <div class="topbar__actions">
-      <input id="apiBaseInput" type="text" placeholder="API base (same origin)" title="Override the API base URL — shared with the Operative Terminal" style="width:200px;" />
+      <label class="visually-hidden" for="apiBaseInput">API base URL</label>
+      <input id="apiBaseInput" class="api-base-input" type="text" placeholder="API base (same origin)" title="Override the API base URL — shared with the Operative Terminal" />
       <button class="btn-ghost btn" id="apiBaseSaveBtn">Set API</button>
       <a class="btn-ghost btn" href="index.html">← Operative Terminal</a>
       <button class="btn-ghost btn" id="logoutBtn">Logout</button>
     </div>
-  </div>
+  </nav>
 
-  <div class="page">
-    <div class="flash" id="flash"></div>
+  <main class="page">
+    <div class="flash" id="flash" role="status"></div>
 
     <!-- ---- Timed Events ------------------------------------------------------ -->
     <section class="panel">
@@ -148,7 +149,7 @@
         </table>
       </div>
     </section>
-  </div>
+  </main>
 </div>
 
 <!-- ===================== QUEST MODAL ======================================= -->

@@ -1,5 +1,7 @@
 package com.litrpg.fitness.dto;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
+
 public class AuthResponse {
 
     private String token;
@@ -31,6 +33,7 @@ public class AuthResponse {
         this.username = username;
     }
 
+    @JsonProperty("isAdmin")
     public boolean isAdmin() {
         return isAdmin;
     }

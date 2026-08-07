@@ -6,13 +6,13 @@
 <title>Iron Path — Operative Terminal</title>
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-<link href="https://fonts.googleapis.com/css2?family=Silkscreen:wght@400;700&family=Share+Tech+Mono&display=swap" rel="stylesheet" />
+<link href="https://fonts.googleapis.com/css2?family=Staatliches&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
 <link rel="stylesheet" href="css/app.css" />
 </head>
 <body>
   <div class="app" id="app" hidden>
-    <div class="topbar">
-      <span class="conn"><span class="dot" id="connDot"></span><span id="connText">connecting…</span></span>
+    <nav class="topbar" aria-label="Primary">
+      <span class="conn" role="status"><span class="dot" id="connDot"></span><span id="connText">connecting…</span></span>
       <button class="friends-link" id="openBadgesBtn">🏅 Badges</button>
       <button class="friends-link" id="openLeaderboardBtn">🏆 Rankings</button>
       <button class="friends-link" id="openCustomizeBtn">🎭 Customize</button>
@@ -20,12 +20,12 @@
       <button class="friends-link" id="openAccountBtn">🔑 Account</button>
       <button class="friends-link" id="logoutBtn">⏻ Logout</button>
       <a class="admin-link" id="adminLink" href="admin.html" hidden>⚙ Admin</a>
-    </div>
+    </nav>
 
-    <div class="banner" id="banner"></div>
+    <div class="banner" id="banner" role="alert"></div>
 
     <!-- HUD -->
-    <section class="panel" id="hudPanel" aria-label="Character header">
+    <header class="panel" id="hudPanel" aria-label="Character header">
       <div class="hud__top">
         <div class="hud__id">
           <div class="eyebrow">Awakened Operative</div>
@@ -43,10 +43,11 @@
       </div>
       <div class="hud__xp">
         <div class="xp-row"><span>Character XP</span><span class="xp-val"><span id="charXp">0</span> / <span id="charXpMax">100</span></span></div>
-        <div class="bar"><div class="bar__fill" id="charXpFill"></div></div>
+        <div class="bar" role="meter" aria-label="Character XP" aria-valuemin="0" id="charXpMeter"><div class="bar__fill" id="charXpFill"></div></div>
       </div>
-    </section>
+    </header>
 
+    <main>
     <!-- main grid -->
     <div class="grid">
       <section class="panel" aria-label="Attributes">
@@ -58,7 +59,10 @@
 
       <section class="panel" aria-label="Quest board">
         <span class="corner-tag">Daily</span>
-        <h2 class="panel-title"><span class="glyph">▣</span> Quest Board <button class="frow-btn" id="openSubmitQuestBtn" style="float:right; font-size:11px;">+ Submit a Quest</button></h2>
+        <div class="panel-title-row">
+          <h2 class="panel-title"><span class="glyph">▣</span> Quest Board</h2>
+          <button class="frow-btn" id="openSubmitQuestBtn">+ Submit a Quest</button>
+        </div>
         <div class="event-banner" id="eventBanner" hidden></div>
         <div class="tag-chips" id="tagChips"></div>
         <div class="quest-list" id="questList"></div>
@@ -89,6 +93,7 @@
       <h2 class="panel-title"><span class="glyph">&gt;</span> Combat Log</h2>
       <div class="log__body" id="logBody"></div>
     </section>
+    </main>
   </div>
 
   <!-- overlay -->
@@ -105,7 +110,7 @@
         <input id="ovPassword" type="password" autocomplete="new-password" maxlength="255" placeholder="min. 8 characters" />
       </div>
       <div class="field" id="ovQuestionField">
-        <label for="ovQuestion">Security Question <span style="text-transform:none;letter-spacing:0;">(for password recovery)</span></label>
+        <label for="ovQuestion">Security Question <span class="label-hint">(for password recovery)</span></label>
         <input id="ovQuestion" type="text" maxlength="255" placeholder="e.g. Name of your first pet?" />
       </div>
       <div class="field" id="ovAnswerField">
@@ -113,8 +118,8 @@
         <input id="ovAnswer" type="text" maxlength="255" autocomplete="off" />
       </div>
       <div class="field" id="ovForgotQuestionField" hidden>
-        <label>Security Question</label>
-        <p id="ovForgotQuestionText" style="color:var(--text); font-size:14px; margin:0;"></p>
+        <span class="field-static-label">Security Question</span>
+        <p id="ovForgotQuestionText" class="field-static-value"></p>
       </div>
       <div class="field" id="ovNewPasswordField" hidden>
         <label for="ovNewPassword">New Password</label>
@@ -159,7 +164,7 @@
       <div class="overlay__actions">
         <button class="btn-primary" id="acctSubmit">Save</button>
       </div>
-      <hr style="border-color:var(--border); margin:20px 0;" />
+      <hr class="ov-divider" />
       <p class="overlay__sub">Only needed if this page is hosted separately from the API.</p>
       <div class="field">
         <label for="acctApiBase">API Base URL</label>
