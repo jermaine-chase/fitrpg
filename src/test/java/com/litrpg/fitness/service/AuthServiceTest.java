@@ -229,6 +229,78 @@ class AuthServiceTest {
     }
 
     @Test
+    void resetPassword_locksAccountAfterTooManyFailedAttempts() {
+        User user = new User("hero", "old-hash");
+        user.setSecurityAnswerHash("answer-hash");
+        when(userRepository.findByUsernameIgnoreCase("hero")).thenReturn(Optional.of(user));
+        when(passwordEncoder.matches("wrong", "answer-hash")).thenReturn(false);
+
+        for (int i = 0; i < 5; i++) {
+            assertThatThrownBy(() -> authService.resetPassword("hero", "wrong", "newpassword"))
+                    .isInstanceOf(ResponseStatusException.class)
+                    .hasMessageContaining("Incorrect answer");
+        }
+
+        assertThatThrownBy(() -> authService.resetPassword("hero", "wrong", "newpassword"))
+                .isInstanceOf(ResponseStatusException.class)
+                .hasMessageContaining("Too many incorrect attempts");
+
+        verify(userRepository, never()).save(any());
+    }
+
+    @Test
+    void resetPassword_lockoutIsScopedPerUsername() {
+        User hero = new User("hero", "hash");
+        hero.setSecurityAnswerHash("hero-answer-hash");
+        User sidekick = new User("sidekick", "hash2");
+        sidekick.setId(UUID.randomUUID());
+        sidekick.setSecurityAnswerHash("sidekick-answer-hash");
+        when(userRepository.findByUsernameIgnoreCase("hero")).thenReturn(Optional.of(hero));
+        when(userRepository.findByUsernameIgnoreCase("sidekick")).thenReturn(Optional.of(sidekick));
+        when(passwordEncoder.matches("wrong", "hero-answer-hash")).thenReturn(false);
+        when(passwordEncoder.matches("blue", "sidekick-answer-hash")).thenReturn(true);
+        when(passwordEncoder.encode("newpassword")).thenReturn("new-hash");
+        when(jwtService.generateToken(sidekick.getId(), "sidekick", false)).thenReturn("token-xyz");
+
+        for (int i = 0; i < 5; i++) {
+            assertThatThrownBy(() -> authService.resetPassword("hero", "wrong", "newpassword"))
+                    .isInstanceOf(ResponseStatusException.class);
+        }
+
+        // "hero" is now locked out, but a different username has its own, untouched attempt counter.
+        AuthResponse response = authService.resetPassword("sidekick", "blue", "newpassword");
+        assertThat(response.getToken()).isEqualTo("token-xyz");
+    }
+
+    @Test
+    void resetPassword_successfulResetClearsTheFailureCounter() {
+        User user = new User("hero", "old-hash");
+        user.setId(UUID.randomUUID());
+        user.setSecurityAnswerHash("answer-hash");
+        when(userRepository.findByUsernameIgnoreCase("hero")).thenReturn(Optional.of(user));
+        when(passwordEncoder.matches("wrong", "answer-hash")).thenReturn(false);
+        when(passwordEncoder.matches("blue", "answer-hash")).thenReturn(true);
+        when(passwordEncoder.encode("newpassword")).thenReturn("new-hash");
+        when(jwtService.generateToken(user.getId(), "hero", false)).thenReturn("token-1");
+
+        for (int i = 0; i < 4; i++) {
+            assertThatThrownBy(() -> authService.resetPassword("hero", "wrong", "newpassword"))
+                    .isInstanceOf(ResponseStatusException.class)
+                    .hasMessageContaining("Incorrect answer");
+        }
+
+        // Succeeds before hitting the lockout threshold, which should reset the counter.
+        AuthResponse response = authService.resetPassword("hero", "blue", "newpassword");
+        assertThat(response.getToken()).isEqualTo("token-1");
+
+        for (int i = 0; i < 4; i++) {
+            assertThatThrownBy(() -> authService.resetPassword("hero", "wrong", "newpassword"))
+                    .isInstanceOf(ResponseStatusException.class)
+                    .hasMessageContaining("Incorrect answer");
+        }
+    }
+
+    @Test
     void updateSecurityQuestion_succeedsWithCorrectPassword() {
         User user = new User("hero", "current-hash");
         UUID id = UUID.randomUUID();
