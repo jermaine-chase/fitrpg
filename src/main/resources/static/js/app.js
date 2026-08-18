@@ -1379,7 +1379,7 @@ async function boot() {
     setConn(false);
     $('#app').hidden = false;
     if (e.status === 404) { localStorage.removeItem(LS.charId); openOverlay(); }
-    else if (e.status === 401) {
+    else if (e.status === 401 || e.status === 403) {
       localStorage.removeItem(LS.charId); localStorage.removeItem(LS.token); localStorage.removeItem(LS.isAdmin);
       applyAdminLinkVisibility();
       openOverlay('login');
