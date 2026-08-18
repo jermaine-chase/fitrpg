@@ -5,27 +5,37 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.web.servlet.config.annotation.CorsRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
+import java.util.stream.Stream;
+
 /**
  * Cross-Origin Resource Sharing for the API.
  *
- * <p>The standalone HTML/JS client runs on a different origin from the API
- * (e.g. a file:// page, a local static server, or a separate host), so the
- * browser requires CORS headers on {@code /api/**}.
- *
- * <p>Allowed origins are configurable via the {@code APP_CORS_ALLOWED_ORIGINS}
- * environment variable (comma-separated). The default {@code *} is convenient
- * for local development; tighten it to your real frontend origin in production.
+ * <p>The app serves its own frontend, so ordinary usage is same-origin and
+ * never triggers CORS at all. This only matters if a frontend hosted on a
+ * <em>different</em> origin needs to call this API — in that case, set the
+ * {@code APP_CORS_ALLOWED_ORIGINS} environment variable (comma-separated).
+ * With nothing configured, no cross-origin mapping is registered and
+ * cross-origin requests to {@code /api/**} are simply not permitted.
  */
 @Configuration
 public class WebConfig implements WebMvcConfigurer {
 
-    @Value("${app.cors.allowed-origins:*}")
-    private String[] allowedOrigins;
+    @Value("${app.cors.allowed-origins:}")
+    private String allowedOrigins;
 
     @Override
     public void addCorsMappings(CorsRegistry registry) {
+        String[] origins = Stream.of(allowedOrigins.split(","))
+                .map(String::trim)
+                .filter(s -> !s.isEmpty())
+                .toArray(String[]::new);
+
+        if (origins.length == 0) {
+            return;
+        }
+
         registry.addMapping("/api/**")
-                .allowedOriginPatterns(allowedOrigins)
+                .allowedOriginPatterns(origins)
                 .allowedMethods("GET", "POST", "PUT", "DELETE", "OPTIONS")
                 .allowedHeaders("*")
                 .allowCredentials(false)
