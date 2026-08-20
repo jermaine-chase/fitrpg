@@ -123,11 +123,16 @@ rather than email, since the app has no mail infrastructure:
   set one this way.
 
 Note: a security-question flow inherently confirms whether a username
-exists, and there's no rate-limiting on any endpoint in this app — treat this
-as best-effort recovery for a personal project, not a hardened flow.
+exists — treat this as best-effort recovery for a personal project, not a
+hardened flow. `POST /api/auth/{register,login,forgot-password,reset-password}`
+are rate-limited (10 requests / 5 min per client IP, see `RateLimitFilter`),
+and `reset-password` additionally locks out an individual username for 15
+minutes after 5 wrong security-answer guesses, independent of which IP the
+guesses came from (see [Self-hosting / exposing to the internet](#self-hosting--exposing-to-the-internet)).
 
-Override in production via env vars: `JWT_SECRET` (random string, ≥32 bytes)
-and `JWT_EXPIRATION_MS`.
+`JWT_SECRET` (random string, ≥32 bytes — generate with `openssl rand -base64
+48`) is **required**; the app refuses to start without it, no insecure
+default. `JWT_EXPIRATION_MS` is optional (default 24h).
 
 ```bash
 # Register (also returns a token, no separate login needed right after)
@@ -275,9 +280,12 @@ plus a toast the moment a claim unlocks one.
 
 ## Run locally
 
-Requires a local Postgres named `fitrpg_db` (or edit `application.properties`).
+Requires a local Postgres named `fitrpg_db` (or edit `application.properties`)
+and a `JWT_SECRET` env var (see [Auth, roles & account
+recovery](#auth-roles--account-recovery) — there's no insecure default).
 
 ```bash
+export JWT_SECRET=$(openssl rand -base64 48)
 mvn spring-boot:run
 ```
 
@@ -287,6 +295,44 @@ will build the datasource from a `DATABASE_URL` env var (the
 `postgres://user:pass@host:port/db` convention used by many hosting
 providers) if one is set, otherwise it falls back to the
 `spring.datasource.*` properties for local development.
+
+To expose this to the internet rather than just `localhost`, see
+[Self-hosting / exposing to the internet](#self-hosting--exposing-to-the-internet).
+
+## Self-hosting / exposing to the internet
+
+This instance is self-hosted: the Spring Boot app and its Postgres database
+both run on a personal machine, with [`cloudflared`](https://github.com/cloudflare/cloudflared)
+(Cloudflare Tunnel) exposing the app to the public internet without opening
+any inbound ports on the router. `cloudflared` proxies HTTPS traffic from a
+Cloudflare-assigned (or custom) hostname to the app's local port; Postgres
+itself is **not** tunneled and stays reachable only from localhost.
+
+Moving from `localhost`-only to internet-reachable changes what's actually at
+risk, so a few things are enforced/hardened specifically because of this:
+
+- **`JWT_SECRET` must be set** — the checked-in fallback secret was removed;
+  the app won't boot without a real one in the environment. Set it wherever
+  the app is actually launched, before `cloudflared` starts routing traffic
+  to it.
+- **Rate limiting** on the open `/api/auth/**` endpoints (`RateLimitFilter`)
+  and a **per-account lockout** on password-reset guesses (`AuthService`) —
+  both endpoints anyone on the internet can now reach unauthenticated.
+- **CORS defaults closed** (`app.cors.allowed-origins` empty) rather than
+  `*` — irrelevant for same-origin use (the normal way to use this app), but
+  previously would have let any website's JS call the now-public API.
+
+Not handled by the app itself, worth knowing if you're running this the same
+way:
+
+- `cloudflared`'s free tier is a plain TCP/HTTP proxy — it does **not** add a
+  WAF or its own rate limiting. The app's own `RateLimitFilter` is the only
+  throttling in front of `/api/auth/**` unless you configure Cloudflare
+  Access/WAF rules separately.
+- The DB password and other `spring.datasource.*` values in
+  `application.properties` are fine as committed defaults *only* because
+  Postgres is local-only and never exposed through the tunnel — don't reuse
+  this setup if the database itself ever needs to be reachable remotely.
 
 ## Frontend (standalone UI)
 
@@ -327,8 +373,10 @@ visits) or set it directly — `index.html` has an "API Base URL" field in the
 Account overlay, `admin.html` has one in its topbar. Clearing the field (or
 passing `?api=`) reverts to same-origin.
 
-CORS is handled by `WebConfig` (`app.cors.allowed-origins`, default `*`).
-Tighten it in production via the `APP_CORS_ALLOWED_ORIGINS` env var.
+CORS is handled by `WebConfig` (`app.cors.allowed-origins`, default empty —
+no cross-origin mapping is registered at all, since same-origin usage never
+needs one). Only set `APP_CORS_ALLOWED_ORIGINS` if a frontend hosted on a
+different origin needs to call this API.
 
 ## API quick reference
 

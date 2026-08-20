@@ -1,6 +1,7 @@
 package com.litrpg.fitness.config;
 
 import com.litrpg.fitness.security.JwtAuthenticationFilter;
+import com.litrpg.fitness.security.RateLimitFilter;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.Customizer;
@@ -26,7 +27,8 @@ public class SecurityConfig {
 
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http,
-                                            JwtAuthenticationFilter jwtAuthenticationFilter) throws Exception {
+                                            JwtAuthenticationFilter jwtAuthenticationFilter,
+                                            RateLimitFilter rateLimitFilter) throws Exception {
         return http
                 // Delegate CORS to the WebMvcConfigurer in WebConfig.
                 .cors(Customizer.withDefaults())
@@ -45,6 +47,7 @@ public class SecurityConfig {
                         .requestMatchers("/api/quests/submit").authenticated()
                         .anyRequest().permitAll()
                 )
+                .addFilterBefore(rateLimitFilter, UsernamePasswordAuthenticationFilter.class)
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
                 .build();
     }

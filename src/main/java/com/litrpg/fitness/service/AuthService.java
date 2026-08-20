@@ -17,7 +17,9 @@ import org.springframework.web.server.ResponseStatusException;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.Locale;
+import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Player account registration, login, and logout. Issues (and, on logout,
@@ -31,6 +33,17 @@ public class AuthService {
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
     private final RevokedTokenRepository revokedTokenRepository;
+
+    /**
+     * Per-account lockout for the security-answer guess in
+     * {@link #resetPassword}. RateLimitFilter throttles by IP, but a
+     * distributed attacker can spread guesses across IPs against a single
+     * target username — this closes that gap by tracking failures per
+     * username instead, independent of where the request came from.
+     */
+    private static final int MAX_RESET_FAILURES = 5;
+    private static final long RESET_LOCKOUT_WINDOW_MILLIS = 15 * 60 * 1000L;
+    private final Map<String, FailureTracker> resetPasswordFailures = new ConcurrentHashMap<>();
 
     public AuthService(UserRepository userRepository, PasswordEncoder passwordEncoder, JwtService jwtService,
                         RevokedTokenRepository revokedTokenRepository) {
@@ -99,16 +112,54 @@ public class AuthService {
      */
     @Transactional
     public AuthResponse resetPassword(String username, String securityAnswer, String newPassword) {
-        User user = userRepository.findByUsernameIgnoreCase(username)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Incorrect answer"));
-        if (user.getSecurityAnswerHash() == null
-                || !passwordEncoder.matches(normalizeAnswer(securityAnswer), user.getSecurityAnswerHash())) {
+        String lockoutKey = username.trim().toLowerCase(Locale.ROOT);
+        FailureTracker tracker = resetPasswordFailures.computeIfAbsent(lockoutKey, k -> new FailureTracker());
+        tracker.assertNotLocked();
+
+        User user = userRepository.findByUsernameIgnoreCase(username).orElse(null);
+        boolean correct = user != null && user.getSecurityAnswerHash() != null
+                && passwordEncoder.matches(normalizeAnswer(securityAnswer), user.getSecurityAnswerHash());
+        if (!correct) {
+            tracker.recordFailure();
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Incorrect answer");
         }
+        tracker.reset();
+
         user.setPasswordHash(passwordEncoder.encode(newPassword));
         userRepository.save(user);
         String token = jwtService.generateToken(user.getId(), user.getUsername(), user.isAdmin());
         return new AuthResponse(token, user.getUsername(), user.isAdmin());
+    }
+
+    private static final class FailureTracker {
+        private long windowStart = System.currentTimeMillis();
+        private int failures = 0;
+
+        synchronized void assertNotLocked() {
+            rollWindowIfExpired();
+            if (failures >= MAX_RESET_FAILURES) {
+                throw new ResponseStatusException(HttpStatus.TOO_MANY_REQUESTS,
+                        "Too many incorrect attempts. Please wait 15 minutes and try again.");
+            }
+        }
+
+        synchronized void recordFailure() {
+            rollWindowIfExpired();
+            failures++;
+        }
+
+        synchronized void reset() {
+            failures = 0;
+            windowStart = System.currentTimeMillis();
+        }
+
+        private void rollWindowIfExpired() {
+            long now = System.currentTimeMillis();
+            if (now - windowStart > RESET_LOCKOUT_WINDOW_MILLIS) {
+                windowStart = now;
+                failures = 0;
+            }
+        }
     }
 
     /** The calling account's current security question, or {@code null} if none is set. */
