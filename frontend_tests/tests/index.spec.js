@@ -14,6 +14,10 @@ async function gotoApp(page) {
   await page.goto('/index.html');
 }
 
+async function openMenu(page) {
+  await page.locator('#menuToggleBtn').click();
+}
+
 async function clearStorage(page) {
   await page.addInitScript(() => { localStorage.clear(); sessionStorage.clear(); });
 }
@@ -144,6 +148,7 @@ test.describe('Register as the first (admin) account', () => {
     await page.locator('#ovName').fill('AdminHero');
     await page.locator('#ovSubmit').click();
     await expect(page.locator('#app')).not.toHaveAttribute('hidden');
+    await openMenu(page);
     await expect(page.locator('#adminLink')).toBeVisible();
   });
 });
@@ -555,6 +560,7 @@ test.describe('Account security panel', () => {
   test('shows a prompt to set a question when none exists yet', async ({ page }) => {
     await setupIndexApiMocks(page, { securityQuestion: null });
     await gotoApp(page);
+    await openMenu(page);
     await page.locator('#openAccountBtn').click();
     await expect(page.locator('#accountOverlay')).toHaveClass(/show/);
     await expect(page.locator('#acctSub')).toContainText(/no recovery question set/i);
@@ -563,6 +569,7 @@ test.describe('Account security panel', () => {
   test('shows the current question when one is already set', async ({ page }) => {
     await setupIndexApiMocks(page, { securityQuestion: 'First pet?' });
     await gotoApp(page);
+    await openMenu(page);
     await page.locator('#openAccountBtn').click();
     await expect(page.locator('#acctSub')).toContainText('First pet?');
   });
@@ -570,6 +577,7 @@ test.describe('Account security panel', () => {
   test('requires the current password, a question and an answer to save', async ({ page }) => {
     await setupIndexApiMocks(page);
     await gotoApp(page);
+    await openMenu(page);
     await page.locator('#openAccountBtn').click();
     await page.locator('#acctSubmit').click();
     await expect(page.locator('#acctErr')).toContainText(/current password/i);
@@ -578,6 +586,7 @@ test.describe('Account security panel', () => {
   test('saving updates the question and logs a system message', async ({ page }) => {
     await setupIndexApiMocks(page);
     await gotoApp(page);
+    await openMenu(page);
     await page.locator('#openAccountBtn').click();
     await page.locator('#acctCurrentPassword').fill('correct-horse-battery');
     await page.locator('#acctQuestion').fill('Favorite color?');
@@ -590,6 +599,7 @@ test.describe('Account security panel', () => {
   test('close button hides the overlay', async ({ page }) => {
     await setupIndexApiMocks(page);
     await gotoApp(page);
+    await openMenu(page);
     await page.locator('#openAccountBtn').click();
     await page.locator('#accountCloseBtn').click();
     await expect(page.locator('#accountOverlay')).not.toHaveClass(/show/);
@@ -606,6 +616,7 @@ test.describe('Allies overlay', () => {
     await seedCharacterStorage(page);
     await setupIndexApiMocks(page);
     await gotoApp(page);
+    await openMenu(page);
     await page.locator('#openFriendsBtn').click();
     await expect(page.locator('#friendsOverlay')).toHaveClass(/show/);
   });
@@ -657,22 +668,32 @@ test.describe('Abandon run', () => {
     await gotoApp(page);
   });
 
-  test('asks for confirmation before deleting the character', async ({ page }) => {
-    let confirmed = false;
-    page.once('dialog', async dialog => { confirmed = true; await dialog.dismiss(); });
+  test('opens a type-to-confirm modal instead of a native dialog', async ({ page }) => {
     await page.locator('#abandonBtn').click();
-    expect(confirmed).toBe(true);
+    await expect(page.locator('#abandonOverlay')).toHaveClass(/show/);
+    await expect(page.locator('#abandonSummary')).toContainText(MOCK_CHARACTER.characterName);
   });
 
-  test('cancelling the dialog keeps the dashboard visible', async ({ page }) => {
-    page.once('dialog', dialog => dialog.dismiss());
+  test('the delete button stays disabled until the operative name is typed exactly', async ({ page }) => {
     await page.locator('#abandonBtn').click();
+    await expect(page.locator('#abandonConfirmBtn')).toBeDisabled();
+    await page.locator('#abandonConfirmName').fill('wrong name');
+    await expect(page.locator('#abandonConfirmBtn')).toBeDisabled();
+    await page.locator('#abandonConfirmName').fill(MOCK_CHARACTER.characterName);
+    await expect(page.locator('#abandonConfirmBtn')).toBeEnabled();
+  });
+
+  test('cancelling keeps the dashboard visible and does not delete', async ({ page }) => {
+    await page.locator('#abandonBtn').click();
+    await page.locator('#abandonCancelBtn').click();
+    await expect(page.locator('#abandonOverlay')).not.toHaveClass(/show/);
     await expect(page.locator('#app')).not.toHaveAttribute('hidden');
   });
 
-  test('confirming resets to the registration overlay', async ({ page }) => {
-    page.once('dialog', dialog => dialog.accept());
+  test('confirming with the matching name resets to the registration overlay', async ({ page }) => {
     await page.locator('#abandonBtn').click();
+    await page.locator('#abandonConfirmName').fill(MOCK_CHARACTER.characterName);
+    await page.locator('#abandonConfirmBtn').click();
     await expect(page.locator('#overlay')).toHaveClass(/show/);
     await expect(page.locator('#ovTitle')).toHaveText('Bind Your Soul');
   });
@@ -696,6 +717,7 @@ test.describe('Navigation', () => {
     await seedCharacterStorage(page, { isAdmin: true });
     await setupIndexApiMocks(page, { isAdmin: true });
     await gotoApp(page);
+    await openMenu(page);
     const link = page.locator('#adminLink');
     await expect(link).toBeVisible();
     await expect(link).toHaveAttribute('href', 'admin.html');
@@ -706,6 +728,7 @@ test.describe('Navigation', () => {
     await seedCharacterStorage(page);
     await setupIndexApiMocks(page);
     await gotoApp(page);
+    await openMenu(page);
     page.once('dialog', dialog => dialog.accept());
     await page.locator('#logoutBtn').click();
     await expect(page.locator('#overlay')).toHaveClass(/show/);

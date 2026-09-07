@@ -60,7 +60,7 @@ const todayStr        = () => { const d = new Date(); return `${d.getFullYear()}
 
 /* ========================== state ========================================= */
 let state = { char: null, history: [], daily: null, dailyBonusMultiplier: 1 };
-let ui    = { activeQuestId: null, checked: false, busy: false, pendingLevelUp: false, tagFilter: null };
+let ui    = { activeQuestId: null, checked: false, busy: false, pendingLevelUp: false, tagFilter: null, questSort: 'default' };
 let quests = [];
 let prevStatPct = {};
 
@@ -412,12 +412,48 @@ function renderStats() {
   });
 }
 
+function sortQuests(list, c) {
+  if (ui.questSort === 'default') return list;
+  const scale = questXpScale(c.currentLevel);
+  const mult  = multiplierFor(c.streakCount);
+  const totalXp = q => {
+    const dailyMult = q.questId === state.daily ? state.dailyBonusMultiplier : 1;
+    const eventMult = eventMultiplierFor(q.targetStat);
+    return (q.baseStatXp + q.baseCharacterXp) * scale * mult * dailyMult * eventMult;
+  };
+  const sorted = [...list];
+  if (ui.questSort === 'name') {
+    sorted.sort((a, b) => a.title.localeCompare(b.title));
+  } else if (ui.questSort === 'xp') {
+    sorted.sort((a, b) => totalXp(b) - totalXp(a));
+  } else if (ui.questSort === 'stat') {
+    sorted.sort((a, b) => a.targetStat.localeCompare(b.targetStat) || a.title.localeCompare(b.title));
+  }
+  return sorted;
+}
+
+function updateQuestCountBadge(openCount) {
+  const el = $('#questCountBadge'); if (!el) return;
+  el.textContent = `${openCount} open today`;
+}
+
+/*
+ * Picks one quest to call out as "closest to done" / recommended. This app
+ * doesn't track partial per-quest progress, so the best available signal is
+ * simply the first not-yet-cleared, level-eligible quest in view order.
+ */
+function pickFeaturedQuestId(list, done) {
+  const open = list.find(q => !done.has(q.questId));
+  return open ? open.questId : null;
+}
+
 function renderQuestBoard() {
   const c = state.char;
   if (!c || quests.length === 0) {
     $('#questList').innerHTML = ui.tagFilter
       ? `<p class="quest-empty">No ${esc(ui.tagFilter)} quests unlocked yet.</p>`
       : '<p class="quest-empty">No quests available — check API connection.</p>';
+    updateQuestCountBadge(0);
     return;
   }
 
@@ -425,23 +461,31 @@ function renderQuestBoard() {
   const scale     = questXpScale(c.currentLevel);
   const mult      = multiplierFor(c.streakCount);
 
-  $('#questList').innerHTML = quests.map(q => {
+  const sortedQuests = sortQuests(quests, c);
+  const openCount    = quests.filter(q => !done.has(q.questId)).length;
+  updateQuestCountBadge(openCount);
+  const featuredId   = pickFeaturedQuestId(sortedQuests, done);
+
+  $('#questList').innerHTML = sortedQuests.map(q => {
     const lc       = q.targetStat.toLowerCase();
     const rank     = RANK_LABEL(q.minLevel);
     const cleared  = done.has(q.questId);
     const isActive = q.questId === ui.activeQuestId;
     const isDaily  = q.questId === state.daily && !cleared;
+    const isFeatured = q.questId === featuredId;
     const dailyMult = isDaily ? state.dailyBonusMultiplier : 1;
     const eventMult = eventMultiplierFor(q.targetStat);
     const estStat  = Math.round(q.baseStatXp      * scale * mult * dailyMult * eventMult);
     const estChar  = Math.round(q.baseCharacterXp * scale * mult * dailyMult * eventMult);
+    const isSaving = ui.busy && isActive;
 
     return `
-      <div class="qcard ${isActive ? 'is-active' : ''} ${cleared ? 'is-cleared' : ''} ${isDaily ? 'is-daily' : ''}" data-qid="${esc(q.questId)}">
+      <div class="qcard ${isActive ? 'is-active' : ''} ${cleared ? 'is-cleared' : ''} ${isDaily ? 'is-daily' : ''} ${isFeatured ? 'featured' : ''}" data-qid="${esc(q.questId)}">
         <div class="qcard__header">
           <span class="qcard__rank c-${lc}">${rank}·${q.targetStat}</span>
           ${q.tag ? `<span class="tag-chip" style="cursor:default;">${esc(q.tag)}</span>` : ''}
           ${isDaily ? '<span class="daily-badge" title="Bonus XP for completing today\'s Daily Focus">★ Daily Focus</span>' : ''}
+          ${isFeatured ? '<span class="featured-tag" title="Recommended next quest">Closest to done</span>' : ''}
           <span class="qcard__title">${esc(q.title)}</span>
           <span class="qcard__meta">${q.estimatedMinutes ? `~${q.estimatedMinutes}min · ` : ''}~${estStat+estChar} XP</span>
           <span class="qcard__chevron">▾</span>
@@ -461,9 +505,9 @@ function renderQuestBoard() {
               <span class="reward">~+${estChar} Character XP</span>
             </div>
           </div>
-          <button class="complete" data-qid="${esc(q.questId)}"
+          <button class="complete ${isSaving ? 'loading' : ''}" data-qid="${esc(q.questId)}"
             ${cleared ? 'disabled' : ((!isActive || !ui.checked || ui.busy) ? 'disabled' : '')}>
-            ${cleared ? 'Quest Cleared ✓' : (ui.busy && isActive ? 'Submitting…' : 'Complete Objective')}
+            ${cleared ? 'Quest Cleared ✓' : (isSaving ? '<span class="quest-spinner"></span> Saving…' : 'Complete Objective')}
           </button>
         </div>
       </div>`;
@@ -485,11 +529,18 @@ function renderQuestBoard() {
   $('#questList').querySelectorAll('.qc-check').forEach(chk => {
     chk.addEventListener('change', () => {
       ui.checked = chk.checked;
-      renderQuestBoard();
+      // Update the button in place rather than re-rendering the whole list:
+      // replacing the checkbox's own DOM node mid-tap is what causes Android
+      // Chrome to lose its scroll anchor and jump the page.
+      const btn = chk.closest('.qcard').querySelector('.complete');
+      if (btn) btn.disabled = !ui.checked || ui.busy;
     });
   });
   $('#questList').querySelectorAll('.complete').forEach(btn => {
-    if (!btn.disabled) btn.addEventListener('click', () => claimQuest(btn.dataset.qid));
+    // Disabled buttons never dispatch click events natively, so this is safe
+    // even for cleared/inactive cards; it also lets the checkbox handler
+    // enable a button in place (see .qc-check below) without a full re-render.
+    btn.addEventListener('click', () => claimQuest(btn.dataset.qid));
   });
 }
 
@@ -501,6 +552,18 @@ function renderLog() {
   ).join('');
   body.scrollTop = body.scrollHeight;
 }
+
+/* ========================== topbar menu ==================================== */
+function isMenuOpen() { return !$('#menuDropdown').hidden; }
+function openMenu() {
+  $('#menuDropdown').hidden = false;
+  $('#menuToggleBtn').setAttribute('aria-expanded', 'true');
+}
+function closeMenu() {
+  $('#menuDropdown').hidden = true;
+  $('#menuToggleBtn').setAttribute('aria-expanded', 'false');
+}
+function toggleMenu() { isMenuOpen() ? closeMenu() : openMenu(); }
 
 /* ========================== connection chip =============================== */
 function setConn(ok) {
@@ -594,19 +657,40 @@ function logClaimOutcome(questId, prev, result) {
   });
 }
 
-async function abandonRun() {
+function abandonRun() {
   if (!state.char) return;
-  if (!confirm('Abandon this run? Your operative, all attributes, and logs will be permanently deleted.')) return;
+  const c = state.char;
+  $('#abandonErr').textContent = '';
+  $('#abandonConfirmName').value = '';
+  $('#abandonConfirmBtn').disabled = true;
+  $('#abandonSummary').textContent =
+    `${c.characterName} — Level ${c.currentLevel}, DAY ${c.streakCount} streak, ${c.overallXp} XP.`;
+  $('#abandonOverlay').classList.add('show');
+  $('#abandonConfirmName').focus();
+}
+function closeAbandonOverlay() { $('#abandonOverlay').classList.remove('show'); }
+
+function checkAbandonInput() {
+  const match = state.char && $('#abandonConfirmName').value === state.char.characterName;
+  $('#abandonConfirmBtn').disabled = !match;
+}
+
+async function confirmAbandon() {
+  if (!state.char) return;
+  if ($('#abandonConfirmName').value !== state.char.characterName) return;
+  const btn = $('#abandonConfirmBtn'); btn.disabled = true;
+  $('#abandonErr').textContent = '';
   try {
     await API.remove(state.char.id);
   } catch (e) {
-    if (e.status !== 404) { handleError(e, 'abandon run'); return; }
+    if (e.status !== 404) { $('#abandonErr').textContent = e.message || 'Failed to delete operative.'; btn.disabled = false; return; }
   }
   localStorage.removeItem(LS.log(state.char.id));
   localStorage.removeItem(LS.done(state.char.id));
   localStorage.removeItem(LS.charId);
   localStorage.removeItem(LS.token);
   state.char = null;
+  closeAbandonOverlay();
   openOverlay();
 }
 
@@ -830,7 +914,6 @@ async function openAccountOverlay() {
   $('#acctCurrentPassword').value = '';
   $('#acctQuestion').value = '';
   $('#acctAnswer').value = '';
-  $('#acctApiBase').value = API_BASE;
   $('#accountOverlay').classList.add('show');
   try {
     const res = await API.getSecurityQuestion();
@@ -862,6 +945,12 @@ async function submitAccountOverlay() {
     btn.disabled = false;
   }
 }
+
+function openDevSettingsOverlay() {
+  $('#acctApiBase').value = API_BASE;
+  $('#devSettingsOverlay').classList.add('show');
+}
+function closeDevSettingsOverlay() { $('#devSettingsOverlay').classList.remove('show'); }
 
 function saveApiBaseFromAccount() {
   setApiBase($('#acctApiBase').value);
@@ -1318,7 +1407,17 @@ async function boot() {
   document.addEventListener('click', () => getAudioCtx(), { once: true });
 
   $('#abandonBtn').addEventListener('click', abandonRun);
+  $('#abandonCancelBtn').addEventListener('click', closeAbandonOverlay);
+  $('#abandonCloseBtn').addEventListener('click', closeAbandonOverlay);
+  $('#abandonOverlay').addEventListener('click', e => { if (e.target.id === 'abandonOverlay') closeAbandonOverlay(); });
+  $('#abandonConfirmName').addEventListener('input', checkAbandonInput);
+  $('#abandonConfirmBtn').addEventListener('click', confirmAbandon);
   $('#logoutBtn').addEventListener('click', logoutUser);
+
+  $('#menuToggleBtn').addEventListener('click', e => { e.stopPropagation(); toggleMenu(); });
+  $('#menuDropdown').addEventListener('click', e => { if (e.target.closest('.menu-item')) closeMenu(); });
+  document.addEventListener('click', e => { if (isMenuOpen() && !e.target.closest('.menu-wrap')) closeMenu(); });
+  document.addEventListener('keydown', e => { if (e.key === 'Escape' && isMenuOpen()) closeMenu(); });
   $('#ovSubmit').addEventListener('click',   submitOverlay);
   $('#overlay').addEventListener('keydown', e => {
     if (e.key === 'Enter') submitOverlay();
@@ -1333,6 +1432,10 @@ async function boot() {
   $('#customizeCloseBtn').addEventListener('click', closeCustomize);
   $('#customizeOverlay').addEventListener('click', e => { if (e.target.id === 'customizeOverlay') closeCustomize(); });
   $('#customizeSaveBtn').addEventListener('click', saveCustomization);
+  $('#questSortSelect').addEventListener('change', e => {
+    ui.questSort = e.target.value;
+    renderQuestBoard();
+  });
   $('#openSubmitQuestBtn').addEventListener('click', openSubmitQuest);
   $('#submitQuestCloseBtn').addEventListener('click', closeSubmitQuest);
   $('#submitQuestOverlay').addEventListener('click', e => { if (e.target.id === 'submitQuestOverlay') closeSubmitQuest(); });
@@ -1347,6 +1450,9 @@ async function boot() {
   $('#accountCloseBtn').addEventListener('click', closeAccountOverlay);
   $('#accountOverlay').addEventListener('click', e => { if (e.target.id === 'accountOverlay') closeAccountOverlay(); });
   $('#acctSubmit').addEventListener('click', submitAccountOverlay);
+  $('#openDevSettingsLink').addEventListener('click', e => { e.preventDefault(); closeAccountOverlay(); openDevSettingsOverlay(); });
+  $('#devSettingsCloseBtn').addEventListener('click', closeDevSettingsOverlay);
+  $('#devSettingsOverlay').addEventListener('click', e => { if (e.target.id === 'devSettingsOverlay') closeDevSettingsOverlay(); });
   $('#acctApiBaseSave').addEventListener('click', saveApiBaseFromAccount);
   $('#friendsCloseBtn').addEventListener('click', closeFriends);
   $('#friendsOverlay').addEventListener('click', e => { if (e.target.id === 'friendsOverlay') closeFriends(); });

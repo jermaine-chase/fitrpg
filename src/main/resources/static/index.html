@@ -13,13 +13,18 @@
   <div class="app" id="app" hidden>
     <nav class="topbar" aria-label="Primary">
       <span class="conn" role="status"><span class="dot" id="connDot"></span><span id="connText">connecting…</span></span>
-      <button class="friends-link" id="openBadgesBtn">🏅 Badges</button>
       <button class="friends-link" id="openLeaderboardBtn">🏆 Rankings</button>
-      <button class="friends-link" id="openCustomizeBtn">🎭 Customize</button>
-      <button class="friends-link" id="openFriendsBtn">☍ Allies</button>
-      <button class="friends-link" id="openAccountBtn">🔑 Account</button>
-      <button class="friends-link" id="logoutBtn">⏻ Logout</button>
-      <a class="admin-link" id="adminLink" href="admin.html" hidden>⚙ Admin</a>
+      <div class="menu-wrap">
+        <button class="friends-link menu-toggle" id="menuToggleBtn" aria-haspopup="true" aria-expanded="false">☰ Menu</button>
+        <div class="menu-dropdown" id="menuDropdown" hidden>
+          <button class="menu-item" id="openBadgesBtn">🏅 Badges</button>
+          <button class="menu-item" id="openCustomizeBtn">🎭 Customize</button>
+          <button class="menu-item" id="openFriendsBtn">🤝 Allies</button>
+          <button class="menu-item" id="openAccountBtn">🔑 Account</button>
+          <a class="menu-item admin-link" id="adminLink" href="admin.html" hidden>⚙ Admin</a>
+          <button class="menu-item" id="logoutBtn">⏻ Logout</button>
+        </div>
+      </div>
     </nav>
 
     <div class="banner" id="banner" role="alert"></div>
@@ -35,9 +40,12 @@
           <div class="hud__title" id="charTitle" hidden></div>
         </div>
         <div class="streak">
-          <div class="streak__day"><span class="flame">🔥</span>DAY <span id="streakDay">0</span></div>
-          <div class="streak__buff"><span id="buffVal">1.00</span>x XP Buff</div>
-          <div class="streak__freeze" id="streakFreeze" title="Preserves your streak instead of halving it if you miss a day">🧊 <span id="streakFreezeCount">0</span> freeze</div>
+          <div class="streak__group">
+            <div class="streak__group-label">Streak status</div>
+            <div class="streak__day"><span class="flame">🔥</span>DAY <span id="streakDay">0</span></div>
+            <div class="streak__buff"><span id="buffVal">1.00</span>x XP Buff</div>
+            <div class="streak__freeze" id="streakFreeze" title="Preserves your streak instead of halving it if you miss a day">🧊 <span id="streakFreezeCount">0</span> freeze</div>
+          </div>
           <div class="streak__risk" id="streakRisk" hidden></div>
         </div>
       </div>
@@ -54,17 +62,28 @@
         <span class="corner-tag">Core</span>
         <h2 class="panel-title"><span class="glyph">✦</span> Attributes</h2>
         <div id="statList"></div>
-        <button class="abandon" id="abandonBtn">⌦ Abandon Run (wipe save)</button>
+        <div class="abandon-wrap">
+          <button class="abandon" id="abandonBtn">⌦ Abandon run (wipe save)</button>
+        </div>
       </section>
 
       <section class="panel" aria-label="Quest board">
         <span class="corner-tag">Daily</span>
         <div class="panel-title-row">
-          <h2 class="panel-title"><span class="glyph">▣</span> Quest Board</h2>
+          <h2 class="panel-title"><span class="glyph">▣</span> Quest Board <span class="count-badge" id="questCountBadge"></span></h2>
           <button class="frow-btn" id="openSubmitQuestBtn">+ Submit a Quest</button>
         </div>
         <div class="event-banner" id="eventBanner" hidden></div>
         <div class="tag-chips" id="tagChips"></div>
+        <div class="quest-sort">
+          <label for="questSortSelect">Sort</label>
+          <select id="questSortSelect">
+            <option value="default">Default</option>
+            <option value="name">Name</option>
+            <option value="xp">XP</option>
+            <option value="stat">Stat</option>
+          </select>
+        </div>
         <div class="quest-list" id="questList"></div>
       </section>
     </div>
@@ -164,7 +183,17 @@
       <div class="overlay__actions">
         <button class="btn-primary" id="acctSubmit">Save</button>
       </div>
-      <hr class="ov-divider" />
+      <p class="overlay__toggle">
+        <a href="#" id="openDevSettingsLink">Developer settings</a>
+      </p>
+    </div>
+  </div>
+
+  <!-- developer settings overlay -->
+  <div class="overlay" id="devSettingsOverlay">
+    <div class="panel overlay__card">
+      <button class="ov-close" id="devSettingsCloseBtn" aria-label="Close">✕</button>
+      <h2 class="panel-title"><span class="glyph">⚙</span> Developer Settings</h2>
       <p class="overlay__sub">Only needed if this page is hosted separately from the API.</p>
       <div class="field">
         <label for="acctApiBase">API Base URL</label>
@@ -172,6 +201,26 @@
       </div>
       <div class="overlay__actions">
         <button class="btn-primary" id="acctApiBaseSave">Update Connection</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- abandon run overlay -->
+  <div class="overlay" id="abandonOverlay">
+    <div class="panel overlay__card">
+      <button class="ov-close" id="abandonCloseBtn" aria-label="Close">✕</button>
+      <h2 class="panel-title"><span class="glyph">⌦</span> Abandon Run</h2>
+      <p class="overlay__sub">This permanently deletes your operative, all attributes, and combat logs. This cannot be undone.</p>
+      <div class="field-static-label">You'll lose</div>
+      <p class="field-static-value" id="abandonSummary" style="margin-bottom:16px;"></p>
+      <div class="field">
+        <label for="abandonConfirmName">Type your operative's name to confirm</label>
+        <input id="abandonConfirmName" type="text" autocomplete="off" placeholder="operative name" />
+      </div>
+      <div class="overlay__err" id="abandonErr"></div>
+      <div class="overlay__actions">
+        <button class="btn-ghost" id="abandonCancelBtn">Cancel</button>
+        <button class="btn-primary" id="abandonConfirmBtn" disabled>Delete Permanently</button>
       </div>
     </div>
   </div>
@@ -287,7 +336,7 @@
   <div class="overlay" id="friendsOverlay">
     <div class="panel overlay__card friends-card">
       <button class="ov-close" id="friendsCloseBtn" aria-label="Close">✕</button>
-      <h2 class="panel-title"><span class="glyph">☍</span> Allies Registry</h2>
+      <h2 class="panel-title"><span class="glyph">🤝</span> Allies Registry</h2>
 
       <div class="friends-tabs" id="friendsTabs">
         <button class="ftab active" data-tab="list">Friends</button>
